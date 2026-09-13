@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-对 RT-DETR 系模型(基线 / SurfDETR / 消融变体)在验证集上推理,导出 COCO 格式 predictions.json。
-供 texture_group_eval.py / collect_all_metrics.py 复用。纯推理,无训练。
+Run inference with RT-DETR family models (baseline / SurfDETR / ablation variants) on the validation
+set and export a COCO-format predictions.json.
+Reused by texture_group_eval.py / collect_all_metrics.py. Pure inference, no training.
 
-用法(rtdetr_pytorch 目录下):
-  python tools/export_predictions.py --dataset pcb --ckpt <checkpoint路径> --out <输出json>
+Usage (inside the rtdetr_pytorch directory):
+  python tools/export_predictions.py --dataset pcb --ckpt <checkpoint path> --out <output json>
 """
 import os
 import sys
@@ -39,15 +40,15 @@ DATASETS = {
     },
 }
 
-# 模型 checkpoint 预设(示例路径)。各模型对应 Encode 增强开关如下:
-#   SurfDETR(旧版 AMSF) / ABL-* / RT-DETR / DFDETR(默认),见 build_model。
+# Model checkpoint presets (example paths). Each model's corresponding Encoder enhancement switches are as follows:
+#   SurfDETR (old AMSF) / ABL-* / RT-DETR / DFDETR (default), see build_model.
 CKPTS = {
     ("pcb", "SurfDETR"): os.path.join(REPO_ROOT, "outputs", "pcb", "best_map50.pth"),
     ("deeppcb", "SurfDETR"): os.path.join(REPO_ROOT, "outputs", "deeppcb", "best_map50.pth"),
-    # 纯 RT-DETR 基线
+    # Pure RT-DETR baseline
     ("pcb", "RT-DETR"): os.path.join(REPO_ROOT, "outputs", "pcb", "baseline_map50.pth"),
     ("deeppcb", "RT-DETR"): os.path.join(REPO_ROOT, "outputs", "deeppcb", "baseline_map50.pth"),
-    # 消融变体
+    # Ablation variants
     ("pcb", "ABL-full"): os.path.join(REPO_ROOT, "outputs", "pcb", "abl_full.pth"),
     ("pcb", "ABL-TAM"): os.path.join(REPO_ROOT, "outputs", "pcb", "abl_tam.pth"),
 }
@@ -68,39 +69,39 @@ def build_model(num_classes, use_amsf=False, use_dadc=True, use_swfd=True):
 
 def load_ckpt(model, path):
     ck = torch.load(path, map_location="cpu", weights_only=False)
-    # 逐层取到真正的 state_dict: ema 可能是 {"module":...}; model 直接是权重
+    # Drill down to the real state_dict layer by layer: ema may be {"module": ...}; model is the weights directly
     sd = ck
     for key in ("ema", "model"):
         if isinstance(sd, dict) and key in sd:
             sd = sd[key]
-            # ema 下还有一层 "module"
+            # ema has one more "module" layer underneath
             if isinstance(sd, dict) and "module" in sd:
                 sd = sd["module"]
     missing, unexpected = model.load_state_dict(sd, strict=False)
-    print(f"    加载权重: missing={len(missing)} unexpected={len(unexpected)}")
+    print(f"    Loaded weights: missing={len(missing)} unexpected={len(unexpected)}")
     return model
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", choices=["pcb", "deeppcb"], required=True)
-    ap.add_argument("--model", default=None, help="CKPTS 里的模型名,如 RT-DETR / SurfDETR")
-    ap.add_argument("--ckpt", default=None, help="或直接给 checkpoint 路径")
-    ap.add_argument("--out", default=None, help="输出 predictions.json 路径")
+    ap.add_argument("--model", default=None, help="Model name in CKPTS, e.g. RT-DETR / SurfDETR")
+    ap.add_argument("--ckpt", default=None, help="Or directly give a checkpoint path")
+    ap.add_argument("--out", default=None, help="Output predictions.json path")
     args = ap.parse_args()
 
     cfg = DATASETS[args.dataset]
     ckpt = args.ckpt or CKPTS.get((args.dataset, args.model))
     if not ckpt or not os.path.exists(ckpt):
-        raise SystemExit(f"权重不存在或未配置: dataset={args.dataset} model={args.model} ckpt={ckpt}")
+        raise SystemExit(f"Weights not found or not configured: dataset={args.dataset} model={args.model} ckpt={ckpt}")
     out = args.out or os.path.join(os.path.dirname(ckpt), "predictions_baseline.json" if args.model == "RT-DETR" else "predictions.json")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"模型:{args.model or ckpt}  数据集:{args.dataset}  设备:{device}")
+    print(f"Model: {args.model or ckpt}  Dataset: {args.dataset}  Device: {device}")
 
     model_name = args.model or ""
-    # 各模型的增强模块开关
-    #   RT-DETR: 全关（纯基线）;  legacy SurfDETR/ABL-*: 仅 AMSF;  DFDETR(默认): 仅 DADC+SWFD
+    # Enhancement module switches per model
+    #   RT-DETR: all off (pure baseline);  legacy SurfDETR/ABL-*: only AMSF;  DFDETR (default): only DADC+SWFD
     if model_name == "RT-DETR":
         use_amsf, use_dadc, use_swfd = False, False, False
     elif any(t in model_name for t in ("SurfDETR", "ABL")):
@@ -128,25 +129,25 @@ def main():
         x = tf(img).unsqueeze(0).to(device)
         with torch.no_grad():
             outs = model(x)
-        # postprocessor 期望 orig_target_sizes=[宽,高](x乘第0维,y乘第1维)
+        # postprocessor expects orig_target_sizes=[width, height] (x multiplies dim 0, y multiplies dim 1)
         res = post(outs, torch.tensor([[w0, h0]]).to(device))
         r0 = res[0]  # {"labels","boxes","scores"}
         for l, b, s in zip(r0["labels"].cpu().numpy(), r0["boxes"].cpu().numpy(), r0["scores"].cpu().numpy()):
-            if s < 0.001:  # 保留极低分,让 COCOeval 用完整预测分布
+            if s < 0.001:  # keep very low scores so COCOeval uses the full prediction distribution
                 continue
             x1, y1, x2, y2 = [float(v) for v in b]
             results.append({
                 "image_id": int(img_id),
-                "category_id": int(l) + 1,  # 模型 0-based -> 真值 1-based
+                "category_id": int(l) + 1,  # model 0-based -> ground truth 1-based
                 "bbox": [round(x1, 3), round(y1, 3), round(x2 - x1, 3), round(y2 - y1, 3)],
                 "score": round(float(s), 5),
             })
         if (i + 1) % 20 == 0:
-            print(f"  已处理 {i+1}/{len(files)}")
+            print(f"  Processed {i+1}/{len(files)}")
 
     with open(out, "w", encoding="utf-8") as f:
         json.dump(results, f)
-    print(f"完成: {len(results)} 个预测 -> {out}")
+    print(f"Done: {len(results)} predictions -> {out}")
 
 
 if __name__ == "__main__":

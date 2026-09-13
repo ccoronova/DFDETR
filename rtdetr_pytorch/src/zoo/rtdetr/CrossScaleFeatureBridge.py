@@ -5,28 +5,28 @@ import torch.nn.functional as F
 __all__ = ['CrossScaleFeatureBridge']
 
 
-# 跨尺度注意力模块 - 完全不同于AMSF的注意力机制
+# Cross-scale attention module - a fully different attention mechanism from AMSF
 class CrossScaleAttention(nn.Module):
     """
-    跨尺度注意力模块：在不同尺度特征间建立关联
-    与AMSF不同，该模块专注于跨尺度交互而非单尺度特征增强
+    Cross-scale attention module: establishes associations between features at different scales.
+    Unlike AMSF, this module focuses on cross-scale interaction rather than single-scale feature enhancement
     """
     def __init__(self, in_channels, reduction_ratio=8):
         super().__init__()
         self.channels = in_channels
         self.reduction_channels = max(in_channels // reduction_ratio, 8)
-        
-        # 查询变换 - 用于目标层特征
+
+        # Query transform - used for the target-layer features
         self.query_conv = nn.Conv2d(in_channels, self.reduction_channels, kernel_size=1)
-        
-        # 键值变换 - 用于源层特征
+
+        # Key/value transform - used for the source-layer features
         self.key_conv = nn.Conv2d(in_channels, self.reduction_channels, kernel_size=1)
         self.value_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
-        
-        # 缩放因子
+
+        # Scaling factor
         self.scale = nn.Parameter(torch.ones(1) * self.reduction_channels ** -0.5)
-        
-        # 输出投影
+
+        # Output projection
         self.proj = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, kernel_size=1),
             nn.BatchNorm2d(in_channels)
@@ -34,158 +34,158 @@ class CrossScaleAttention(nn.Module):
 
     def forward(self, x_target, x_source):
         """
-        x_target: 目标特征，注意力的应用对象 [B, C, H, W]
-        x_source: 源特征，提供注意力的信息来源 [B, C, H', W']
+        x_target: target features, the object on which attention is applied [B, C, H, W]
+        x_source: source features, the source that provides the attention information [B, C, H', W']
         """
         batch, _, h_t, w_t = x_target.shape
         _, _, h_s, w_s = x_source.shape
-        
-        # 生成查询、键、值
+
+        # Generate query, key, and value
         q = self.query_conv(x_target).view(batch, self.reduction_channels, -1)  # B, C', H_t*W_t
         k = self.key_conv(x_source).view(batch, self.reduction_channels, -1)    # B, C', H_s*W_s
         v = self.value_conv(x_source).view(batch, self.channels, -1)             # B, C, H_s*W_s
-        
-        # 计算注意力分数 (与AMSF完全不同的注意力计算方式)
+
+        # Compute attention scores (an attention computation fully different from AMSF)
         attn = torch.bmm(q.permute(0, 2, 1), k) * self.scale  # B, H_t*W_t, H_s*W_s
-        attn = F.softmax(attn, dim=-1)  # 归一化注意力权重
-        
-        # 应用注意力权重
+        attn = F.softmax(attn, dim=-1)  # normalize the attention weights
+
+        # Apply the attention weights
         out = torch.bmm(v, attn.permute(0, 2, 1))  # B, C, H_t*W_t
         out = out.view(batch, self.channels, h_t, w_t)
         out = self.proj(out)
-        
+
         return out
 
 
-# 特征空间重组模块 - AMSF没有的组件
+# Feature spatial rearrangement module - a component that AMSF does not have
 class FeatureSpatialRearrangement(nn.Module):
     """
-    特征空间重组：重新排列特征图的空间关系
-    与AMSF的处理方式完全不同，强调空间维度的变换
+    Feature spatial rearrangement: rearranges the spatial relationships of feature maps.
+    Completely different from AMSF's handling, it emphasizes transformations in the spatial dimension
     """
     def __init__(self, channels, num_groups=8):
         super().__init__()
         self.num_groups = num_groups
-        assert channels % num_groups == 0, "通道数必须能被组数整除"
-        
-        # 特征分组处理
+        assert channels % num_groups == 0, "the number of channels must be divisible by the number of groups"
+
+        # Feature grouping
         group_channels = channels // num_groups
         self.group_convs = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(group_channels, group_channels, kernel_size=3, padding=1, groups=group_channels),
-                nn.InstanceNorm2d(group_channels),  # 使用实例归一化而非批归一化(AMSF)
-                nn.GELU()  # GELU与AMSF的ReLU差异化
+                nn.InstanceNorm2d(group_channels),  # use instance normalization instead of batch normalization (AMSF)
+                nn.GELU()  # GELU differentiates from AMSF's ReLU
             )
             for _ in range(num_groups)
         ])
-        
-        # 空间重组混合器 - 修复LayerNorm不兼容的问题
+
+        # Spatial rearrangement mixer - fixes the LayerNorm incompatibility issue
         self.mixer = nn.Sequential(
             nn.Conv2d(channels, channels, 1),
-            nn.BatchNorm2d(channels),  # 使用BatchNorm替代LayerNorm以避免尺寸错误
-            nn.ReLU(inplace=True),     # 使用ReLU替代，确保区别于AMSF
-            nn.Dropout2d(0.1)          # 添加空间Dropout
+            nn.BatchNorm2d(channels),  # use BatchNorm instead of LayerNorm to avoid dimension errors
+            nn.ReLU(inplace=True),     # use ReLU instead, to distinguish from AMSF
+            nn.Dropout2d(0.1)          # add spatial Dropout
         )
-        
+
     def forward(self, x):
         B, C, H, W = x.shape
         group_size = C // self.num_groups
-        
-        # 通道分组
+
+        # Channel grouping
         groups = torch.split(x, group_size, dim=1)
         processed_groups = []
-        
-        # 分组处理
+
+        # Group-wise processing
         for i, (group, conv) in enumerate(zip(groups, self.group_convs)):
-            # 对每个组应用不同方向的变换
-            if i % 4 == 0:  # 水平方向变换
+            # Apply a different transformation to each group
+            if i % 4 == 0:  # horizontal flip
                 group = torch.flip(group, [3])
-            elif i % 4 == 1:  # 垂直方向变换
+            elif i % 4 == 1:  # vertical flip
                 group = torch.flip(group, [2])
-            elif i % 4 == 2:  # 旋转变换
+            elif i % 4 == 2:  # rotation
                 group = torch.rot90(group, 1, [2, 3])
-            
+
             processed = conv(group)
-            
-            # 恢复原始排列
+
+            # Restore the original arrangement
             if i % 4 == 0:
                 processed = torch.flip(processed, [3])
             elif i % 4 == 1:
                 processed = torch.flip(processed, [2])
             elif i % 4 == 2:
                 processed = torch.rot90(processed, -1, [2, 3])
-                
+
             processed_groups.append(processed)
-            
-        # 重组后的特征
+
+        # The rearranged features
         rearranged_feat = torch.cat(processed_groups, dim=1)
         mixed_feat = self.mixer(rearranged_feat)
-        
-        return mixed_feat + x  # 残差连接
+
+        return mixed_feat + x  # residual connection
 
 
-# 多级特征分解模块 - 与AMSF显著不同的特征分解方式
+# Multi-level feature decomposition module - a decomposition clearly different from AMSF
 class MultiLevelFeatureDecomposition(nn.Module):
     """
-    将特征分解为多个组件，每个组件捕获不同频率的信息
-    与AMSF的边缘检测和纹理分析方式完全不同
+    Decomposes a feature into multiple components, each capturing information at a different frequency.
+    Completely different from AMSF's edge detection and texture analysis approach
     """
     def __init__(self, channels, levels=3):
         super().__init__()
         self.levels = levels
-        
-        # 多级特征提取器，使用不同膨胀率捕获不同尺度
+
+        # Multi-level feature extractors that use different dilation rates to capture different scales
         self.decomposers = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(channels, channels, 3, padding=2**i, dilation=2**i, groups=channels),
-                nn.GroupNorm(channels // 16, channels),  # 使用组归一化代替AMSF的批归一化
-                nn.SiLU()  # 使用SiLU激活函数，与AMSF的GELU不同
+                nn.GroupNorm(channels // 16, channels),  # use group normalization instead of AMSF's batch normalization
+                nn.SiLU()  # use the SiLU activation, different from AMSF's GELU
             )
             for i in range(levels)
         ])
-        
-        # 频率通道注意力 - 修复LayerNorm不兼容问题
+
+        # Frequency channel attention - fixes the LayerNorm incompatibility issue
         self.freq_attention = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(channels * levels, channels, 1),
-            nn.BatchNorm2d(channels),  # 使用批归一化替代层归一化
+            nn.BatchNorm2d(channels),  # use batch normalization instead of layer normalization
             nn.ReLU(inplace=True),
             nn.Conv2d(channels, levels, 1),
             nn.Softmax(dim=1)
         )
-        
-        # 输出融合
+
+        # Output fusion
         self.fusion = nn.Conv2d(channels, channels, 1)
-        
+
     def forward(self, x):
-        # 多级特征分解
+        # Multi-level feature decomposition
         decomposed_feats = [decomposer(x) for decomposer in self.decomposers]
-        
-        # 计算不同频率级别的权重
+
+        # Compute the weights of the different frequency levels
         freq_feats = torch.cat(decomposed_feats, dim=1)
         weights = self.freq_attention(freq_feats)
-        
-        # 加权融合
+
+        # Weighted fusion
         weighted_sum = sum(w * feat for w, feat in zip(
-            weights.chunk(self.levels, dim=1), 
+            weights.chunk(self.levels, dim=1),
             decomposed_feats
         ))
-        
-        # 残差连接
+
+        # Residual connection
         return self.fusion(weighted_sum) + x
 
 
-# 异步特征融合器 - 与AMSF的同步融合不同
+# Asynchronous feature fuser - in contrast to AMSF's synchronous fusion
 class AsynchronousFeatureFuser(nn.Module):
     """
-    异步融合来自不同尺度的特征
-    与AMSF的同步处理方式形成明显对比
+    Asynchronously fuses features from different scales
+    Forming a clear contrast with AMSF's synchronous handling
     """
     def __init__(self, channels, hidden_dim=None):
         super().__init__()
         hidden_dim = hidden_dim or channels // 2
-        
-        # 低层特征转换 - 使用空间注意力与通道压缩
+
+        # Low-level feature transform - uses spatial attention and channel compression
         self.low_transform = nn.Sequential(
             nn.Conv2d(channels, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
@@ -194,15 +194,15 @@ class AsynchronousFeatureFuser(nn.Module):
             nn.BatchNorm2d(hidden_dim),
             nn.ReLU()
         )
-        
-        # 中层特征转换 - 保持原始分辨率
+
+        # Mid-level feature transform - preserves the original resolution
         self.mid_transform = nn.Sequential(
             nn.Conv2d(channels, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
             nn.GELU()
         )
-        
-        # 高层特征转换 - 使用上下文增强
+
+        # High-level feature transform - uses context enhancement
         self.high_transform = nn.Sequential(
             nn.Conv2d(channels, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
@@ -211,104 +211,104 @@ class AsynchronousFeatureFuser(nn.Module):
             nn.BatchNorm2d(hidden_dim),
             nn.ReLU()
         )
-        
-        # 特征异步融合 - 顺序处理而非AMSF的并行融合
+
+        # Asynchronous feature fusion - sequential processing rather than AMSF's parallel fusion
         self.fuse_low_mid = nn.Sequential(
             nn.Conv2d(hidden_dim * 2, hidden_dim, 3, padding=1),
             nn.BatchNorm2d(hidden_dim),
             nn.GELU()
         )
-        
+
         self.fuse_all = nn.Sequential(
             nn.Conv2d(hidden_dim * 2, channels, 3, padding=1),
             nn.BatchNorm2d(channels),
             nn.ReLU()
         )
-        
-        # 梯度调节器 - AMSF中不存在
+
+        # Gradient modulator - does not exist in AMSF
         self.gradient_modulator = nn.Parameter(torch.ones(3) * 0.33)
         self.normalize = lambda x: x / x.sum()
-        
+
     def forward(self, low_feat, mid_feat, high_feat):
-        # 确保尺寸一致
+        # Ensure consistent dimensions
         if low_feat.shape[2:] != mid_feat.shape[2:]:
             low_feat = F.interpolate(low_feat, size=mid_feat.shape[2:], mode='bilinear', align_corners=False)
         if high_feat.shape[2:] != mid_feat.shape[2:]:
             high_feat = F.interpolate(high_feat, size=mid_feat.shape[2:], mode='bilinear', align_corners=False)
-        
-        # 特征转换
+
+        # Feature transform
         weights = self.normalize(self.gradient_modulator)
         low_feat = self.low_transform(low_feat) * weights[0]
         mid_feat = self.mid_transform(mid_feat) * weights[1]
         high_feat = self.high_transform(high_feat) * weights[2]
-        
-        # 异步融合 - 先融合低+中，再融合与高
+
+        # Asynchronous fusion - first fuse low+mid, then fuse with high
         low_mid_feat = self.fuse_low_mid(torch.cat([low_feat, mid_feat], dim=1))
         fused_feat = self.fuse_all(torch.cat([low_mid_feat, high_feat], dim=1))
-        
+
         return fused_feat
 
 
 class CrossScaleFeatureBridge(nn.Module):
     """
-    跨尺度特征桥接模块: 连接不同尺度的特征并融合到中间层
-    核心差异：与AMSF是完全不同的架构理念，AMSF关注单尺度特征增强，本模块专注于多尺度特征交互
+    Cross-scale feature bridge module: connects features at different scales and fuses them into the middle layer.
+    Core difference: this is a completely different architectural concept from AMSF. AMSF focuses on single-scale feature enhancement, while this module focuses on multi-scale feature interaction
     """
     def __init__(self, channels, mode='advanced'):
         super().__init__()
         self.channels = channels
         self.mode = mode
-        
-        # 跨尺度注意力 - 连接高层到中层
+
+        # Cross-scale attention - connects the high layer to the middle layer
         self.high_to_mid_attention = CrossScaleAttention(channels)
-        
-        # 跨尺度注意力 - 连接低层到中层 
+
+        # Cross-scale attention - connects the low layer to the middle layer
         self.low_to_mid_attention = CrossScaleAttention(channels)
-        
-        # 特征空间重组 - 用于中层特征
+
+        # Feature spatial rearrangement - used for the middle-layer features
         self.spatial_rearrangement = FeatureSpatialRearrangement(channels)
-        
-        # 多级特征分解 - 用于处理多尺度融合特征
+
+        # Multi-level feature decomposition - used to process the multi-scale fused features
         self.feature_decomposition = MultiLevelFeatureDecomposition(channels)
-        
-        # 异步特征融合器 - 最终融合阶段
+
+        # Asynchronous feature fuser - the final fusion stage
         self.async_fuser = AsynchronousFeatureFuser(channels)
-        
-        # 最终特征优化
+
+        # Final feature refinement
         self.final_process = nn.Sequential(
             nn.Conv2d(channels, channels, 3, padding=1),
             nn.BatchNorm2d(channels),
-            nn.SiLU(),  # 使用SiLU与AMSF的非线性单元形成区别
+            nn.SiLU(),  # use SiLU to differentiate from AMSF's nonlinear units
             nn.Conv2d(channels, channels, 1)
         )
-        
+
     def forward(self, low_feat, mid_feat, high_feat):
         """
-        将低层、中层、高层特征融合到中层特征中
-        low_feat: 低层特征 [B, C, H_l, W_l]
-        mid_feat: 中层特征 [B, C, H_m, W_m]
-        high_feat: 高层特征 [B, C, H_h, W_h]
+        Fuses the low, middle, and high layer features into the middle-layer features
+        low_feat: low-level features [B, C, H_l, W_l]
+        mid_feat: middle-level features [B, C, H_m, W_m]
+        high_feat: high-level features [B, C, H_h, W_h]
         """
-        # 保存原始中层特征作为残差
+        # Save the original middle-layer features as the residual
         identity = mid_feat
-        
-        # 1. 跨尺度注意力 - 高层到中层
+
+        # 1. Cross-scale attention - high layer to middle layer
         high_to_mid = self.high_to_mid_attention(mid_feat, high_feat)
-        
-        # 2. 跨尺度注意力 - 低层到中层
+
+        # 2. Cross-scale attention - low layer to middle layer
         low_to_mid = self.low_to_mid_attention(mid_feat, low_feat)
-        
-        # 3. 特征空间重组 - 重组中层特征
+
+        # 3. Feature spatial rearrangement - rearrange the middle-layer features
         mid_rearranged = self.spatial_rearrangement(mid_feat)
-        
-        # 4. 异步特征融合 - 将三个特征层融合在一起
+
+        # 4. Asynchronous feature fusion - fuse the three feature layers together
         fused_features = self.async_fuser(low_to_mid, mid_rearranged, high_to_mid)
-        
-        # 5. 多级特征分解 - 处理融合特征
+
+        # 5. Multi-level feature decomposition - process the fused features
         enhanced_features = self.feature_decomposition(fused_features)
-        
-        # 6. 最终处理
+
+        # 6. Final processing
         output = self.final_process(enhanced_features)
-        
-        # 残差连接
+
+        # Residual connection
         return output + identity

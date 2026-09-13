@@ -14,12 +14,12 @@ import numpy as np
 import random
 
 # ============================================================
-# 切换数据集：改这一个变量即可（可选值见 dataset_registry.py）
+# Switch dataset: just change this one variable (options in dataset_registry.py)
 # ============================================================
 DATASET = 'pcb'  # pcb | deeppcb | pcb-aol | neu-det | new-gc-net
 
 
-# 忽略特定的警告
+# Ignore specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, message=".*image size.*")
 
 
@@ -33,14 +33,14 @@ def main(args, ) -> None:
     assert not all([args.tuning, args.resume]), \
         'Only support from_scrach or resume or tuning at one time'
 
-    # ---------- 根据 DATASET 变量注入数据集路径 & 类别 ----------
+    # ---------- Inject the dataset path & categories from the DATASET variable ----------
     from configs.dataset.dataset_registry import get_dataset
     from src.data.coco.coco_dataset import set_dataset_categories
 
     ds = get_dataset(DATASET)
     set_dataset_categories(ds['categories'])
 
-    # 把路径和 num_classes 注入到 yaml_cfg 中（deep merge）
+    # Inject the paths and num_classes into yaml_cfg (deep merge)
     cfg = YAMLConfig(
         args.config,
         resume=args.resume,
@@ -52,15 +52,15 @@ def main(args, ) -> None:
     cfg.yaml_cfg['train_dataloader']['dataset']['ann_file'] = ds['train_ann_file']
     cfg.yaml_cfg['val_dataloader']['dataset']['img_folder'] = ds['val_img_folder']
     cfg.yaml_cfg['val_dataloader']['dataset']['ann_file'] = ds['val_ann_file']
-#根据任务配置模型，优化器
-    
+
+    # Configure the model and optimizer according to the task
     solver = TASKS[cfg.yaml_cfg['task']](cfg)
-   
+
     if args.test_only:
-        #如果是验证任务，执行val
-        solver.val()  
+        # If it is a validation task, run validation
+        solver.val()
     else:
-        #执行训练任务
+        # Run the training task
         solver.fit()
 
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--tuning', '-t', type=str, )
     parser.add_argument('--test-only', action='store_true', default=False,)
     parser.add_argument('--amp', action='store_true', default=False,)
-    parser.add_argument('--seed', type=int, help='seed')  # 设置默认随机种子为0
+    parser.add_argument('--seed', type=int, help='seed')  # Set the default random seed to 0
 
     args = parser.parse_args()
   

@@ -13,33 +13,33 @@ matplotlib.use('Agg')  # Use non-interactive backend
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['axes.unicode_minus'] = False
 
-# 设置输出目录
+# Set output directory
 output_dir = "outputs/loss_analysis"
 os.makedirs(output_dir, exist_ok=True)
 
-# 读取txt文件中的数据
+# Read data from the txt file
 log_path = "outputs/log.txt"
 with open(log_path, 'r') as file:
     lines = file.readlines()
 
-# 初始化数据结构
+# Initialize data structures
 epochs = []
 metrics = defaultdict(list)
 
-# 解析每一行的JSON数据
+# Parse JSON data from each line
 for line in lines:
     try:
         data = json.loads(line.strip())
         
-        # 添加epoch
+        # Add epoch
         if 'epoch' in data:
             epochs.append(data['epoch'])
             
-        # 收集所有指标
+        # Collect all metrics
         for key, value in data.items():
             if isinstance(value, (int, float)) or (isinstance(value, list) and all(isinstance(x, (int, float)) for x in value)):
                 if isinstance(value, list):
-                    # 处理列表值（比如精度和召回率）
+                    # Handle list values (e.g. precision and recall)
                     metrics[key].append(value[0] if value else 0)
                 else:
                     metrics[key].append(value)
@@ -48,25 +48,25 @@ for line in lines:
     except Exception as e:
         print(f"Error processing line: {e}")
 
-# 创建数据分析函数
+# Create data analysis function
 def analyze_loss_components():
-    """分析各损失组件的相对贡献并提供建议"""
+    """Analyze the relative contribution of each loss component and provide recommendations"""
     # Ensure sufficient data
     if len(epochs) == 0:
-        return "没有足够的训练数据进行分析"
+        return "Not enough training data to analyze"
     
     # Calculate average loss from the last few epochs
     last_n = min(5, len(epochs))  # Take last 5 epochs or all if less than 5
     
-    # 分离不同类型的损失
+    # Separate different types of losses
     main_losses = {'vfl': [], 'bbox': [], 'giou': []}
     aux_losses = {'vfl': [], 'bbox': [], 'giou': []}
     dn_losses = {'vfl': [], 'bbox': [], 'giou': []}
     
-    # 收集最后n个epoch的数据
+    # Collect data from the last n epochs
     for i in range(-last_n, 0):
         try:
-            # 主损失
+            # Main losses
             if 'train_loss_vfl' in metrics and len(metrics['train_loss_vfl']) > abs(i):
                 main_losses['vfl'].append(metrics['train_loss_vfl'][i])
             if 'train_loss_bbox' in metrics and len(metrics['train_loss_bbox']) > abs(i):
@@ -74,13 +74,13 @@ def analyze_loss_components():
             if 'train_loss_giou' in metrics and len(metrics['train_loss_giou']) > abs(i):
                 main_losses['giou'].append(metrics['train_loss_giou'][i])
             
-            # aux损失（取平均）
+            # Auxiliary losses (averaged)
             aux_vfl = 0
             aux_bbox = 0
             aux_giou = 0
             aux_count = 0
             
-            for j in range(3):  # 假设有3个aux损失
+            for j in range(3):  # Assume 3 auxiliary losses
                 aux_key_vfl = f'train_loss_vfl_aux_{j}'
                 aux_key_bbox = f'train_loss_bbox_aux_{j}'
                 aux_key_giou = f'train_loss_giou_aux_{j}'
@@ -98,13 +98,13 @@ def analyze_loss_components():
                 aux_losses['bbox'].append(aux_bbox / aux_count)
                 aux_losses['giou'].append(aux_giou / aux_count)
             
-            # dn损失（取平均）
+            # DN losses (averaged)
             dn_vfl = 0
             dn_bbox = 0
             dn_giou = 0
             dn_count = 0
             
-            for j in range(3):  # 假设有3个dn损失
+            for j in range(3):  # Assume 3 DN losses
                 dn_key_vfl = f'train_loss_vfl_dn_{j}'
                 dn_key_bbox = f'train_loss_bbox_dn_{j}'
                 dn_key_giou = f'train_loss_giou_dn_{j}'
@@ -123,9 +123,9 @@ def analyze_loss_components():
                 dn_losses['giou'].append(dn_giou / dn_count)
                 
         except Exception as e:
-            print(f"分析过程中出错: {e}")
-    
-    # 计算平均值
+            print(f"Error during analysis: {e}")
+
+    # Compute averages
     def safe_mean(lst):
         return sum(lst) / len(lst) if lst else 0
     
@@ -133,11 +133,11 @@ def analyze_loss_components():
     avg_aux = {k: safe_mean(v) for k, v in aux_losses.items()}
     avg_dn = {k: safe_mean(v) for k, v in dn_losses.items()}
     
-    # 计算主要损失比例
+    # Compute main loss ratios
     total_main = sum(avg_main.values())
     loss_ratios = {k: v/total_main if total_main else 0 for k, v in avg_main.items()}
     
-    # 建议计算
+    # Compute suggestions
     suggestions = []
     
     # 1. Analyze ratio between vfl, bbox and giou losses
@@ -198,18 +198,18 @@ def analyze_loss_components():
         if avg_recall < 0.1:
             suggestions.append(f"Test recall is very low ({avg_recall:.4f}), consider increasing GIoU loss weight to improve localization")
     
-    # 格式化建议输出
-    result = "损失函数参数分析与建议:\n" + "-"*50 + "\n"
-    result += f"主要损失平均值: VFL={avg_main['vfl']:.4f}, BBOX={avg_main['bbox']:.4f}, GIOU={avg_main['giou']:.4f}\n"
-    result += f"损失比例: VFL={loss_ratios['vfl']*100:.1f}%, BBOX={loss_ratios['bbox']*100:.1f}%, GIOU={loss_ratios['giou']*100:.1f}%\n"
-    
+    # Format suggestions output
+    result = "Loss function parameter analysis and recommendations:\n" + "-"*50 + "\n"
+    result += f"Main loss averages: VFL={avg_main['vfl']:.4f}, BBOX={avg_main['bbox']:.4f}, GIOU={avg_main['giou']:.4f}\n"
+    result += f"Loss ratios: VFL={loss_ratios['vfl']*100:.1f}%, BBOX={loss_ratios['bbox']*100:.1f}%, GIOU={loss_ratios['giou']*100:.1f}%\n"
+
     if avg_aux['vfl'] or avg_aux['bbox'] or avg_aux['giou']:
-        result += f"辅助损失平均值: VFL={avg_aux['vfl']:.4f}, BBOX={avg_aux['bbox']:.4f}, GIOU={avg_aux['giou']:.4f}\n"
-    
+        result += f"Auxiliary loss averages: VFL={avg_aux['vfl']:.4f}, BBOX={avg_aux['bbox']:.4f}, GIOU={avg_aux['giou']:.4f}\n"
+
     if avg_dn['vfl'] or avg_dn['bbox'] or avg_dn['giou']:
-        result += f"DN损失平均值: VFL={avg_dn['vfl']:.4f}, BBOX={avg_dn['bbox']:.4f}, GIOU={avg_dn['giou']:.4f}\n"
-    
-    result += "\n建议:\n"
+        result += f"DN loss averages: VFL={avg_dn['vfl']:.4f}, BBOX={avg_dn['bbox']:.4f}, GIOU={avg_dn['giou']:.4f}\n"
+
+    result += "\nRecommendations:\n"
     for i, sugg in enumerate(suggestions, 1):
         result += f"{i}. {sugg}\n"
     
@@ -337,45 +337,45 @@ def plot_detailed_losses():
         plt.savefig(os.path.join(output_dir, 'learning_rate.png'), dpi=300, bbox_inches='tight')
         plt.close()
 
-# 运行分析和可视化
+# Run analysis and visualization
 plot_detailed_losses()
 analysis_result = analyze_loss_components()
 
-# 保存分析结果到文本文件
+# Save analysis result to a text file
 with open(os.path.join(output_dir, 'loss_analysis.txt'), 'w', encoding='utf-8') as f:
     f.write(analysis_result)
 
-print(f"详细损失分析已保存至: {output_dir}")
+print(f"Detailed loss analysis saved to: {output_dir}")
 print("-" * 50)
 print(analysis_result)
 
-# 学习率和epoch分析
+# Learning rate and epoch analysis
 if 'train_lr' in metrics and epochs:
     initial_lr = metrics['train_lr'][0] if metrics['train_lr'] else 0
     final_lr = metrics['train_lr'][-1] if metrics['train_lr'] else 0
     max_epoch = max(epochs) if epochs else 0
-    print("\n学习率与训练轮数分析:")
+    print("\nLearning rate and training epochs analysis:")
     print("-" * 50)
-    print(f"当前设置: 学习率={initial_lr:.8f}, 轮数={max_epoch}")
+    print(f"Current settings: learning rate={initial_lr:.8f}, epochs={max_epoch}")
     # Learning rate recommendations
     if initial_lr < 1e-6:
-        print("学习率可能过低，建议提升到 1e-5 ~ 5e-5")
+        print("Learning rate may be too low, consider increasing to 1e-5 ~ 5e-5")
     elif initial_lr > 1e-4:
-        print("学习率可能过高，建议降低到 1e-5 ~ 5e-5")
+        print("Learning rate may be too high, consider decreasing to 1e-5 ~ 5e-5")
     else:
-        print(f"当前学习率 {initial_lr:.8f} 合理")
+        print(f"Current learning rate {initial_lr:.8f} is reasonable")
     # Epoch recommendations
     if 'train_loss' in metrics and len(metrics['train_loss']) >= 2:
         recent_loss_change = abs(metrics['train_loss'][-1] - metrics['train_loss'][-2])
         if max_epoch < 100:
-            print(f"当前轮数设置（{max_epoch}）可能不足以收敛，建议增加到200-300轮")
+            print(f"Current epoch count ({max_epoch}) may be insufficient for convergence, consider increasing to 200-300 epochs")
         elif recent_loss_change > 0.01 * metrics['train_loss'][-1]:
-            print(f"损失仍在显著变化（变化量: {recent_loss_change:.4f}），建议增加训练轮数")
+            print(f"Loss is still changing significantly (change: {recent_loss_change:.4f}), consider increasing training epochs")
         else:
-            print(f"当前轮数设置（{max_epoch}）较为合适")
+            print(f"Current epoch count ({max_epoch}) is reasonable")
     # Final recommendation
-    print("\n推荐设置:")
+    print("\nRecommended settings:")
     recommended_lr = 2e-5 if initial_lr < 1e-6 or initial_lr > 1e-4 else initial_lr
     recommended_epochs = max(200, max_epoch + 50) if max_epoch < 150 else max_epoch
-    print(f"学习率: {recommended_lr:.8f}")
-    print(f"轮数: {recommended_epochs}")
+    print(f"Learning rate: {recommended_lr:.8f}")
+    print(f"Epochs: {recommended_epochs}")

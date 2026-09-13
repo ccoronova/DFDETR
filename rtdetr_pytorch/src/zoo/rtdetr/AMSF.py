@@ -1,5 +1,5 @@
 
-#多维特征精炼与融合网络 (Multi-dimensional Feature Refinement and Fusion Network)
+# Multi-dimensional Feature Refinement and Fusion Network
 
 import torch
 import torch.nn as nn
@@ -30,9 +30,9 @@ class ChannelSelector(nn.Module):
         self.select_ratio = select_ratio
         self.select_channels = int(in_channels * select_ratio)
         
-        # 通道重要性评估网络
+        # Channel importance evaluation network
         self.importance_net = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),  # 空间池化
+            nn.AdaptiveAvgPool2d(1),  # spatial pooling
             nn.Conv2d(in_channels, in_channels//2, 1),
             nn.ReLU(inplace=True),
             nn.Conv2d(in_channels//2, in_channels, 1),
@@ -40,22 +40,22 @@ class ChannelSelector(nn.Module):
         )
         
     def forward(self, x):
-        # 计算每个通道的重要性分数
+        # Compute the importance score of each channel
         channel_scores = self.importance_net(x)  # [B, C, 1, 1]
         
-        # 选择最重要的通道
+        # Select the most important channels
         B, C = x.shape[:2]
         scores = channel_scores.view(B, C)
         
-        # 获取每个batch中最重要的通道索引
+        # Get the indices of the most important channel in each batch
         _, top_indices = torch.topk(scores, self.select_channels, dim=1)  # [B, select_channels]
         
-        # 准备选择掩码
+        # Prepare the selection mask
         mask = torch.zeros_like(scores)
         mask.scatter_(1, top_indices, 1.0)
         mask = mask.view(B, C, 1, 1)
         
-        # 应用掩码,保留重要通道
+        # Apply the mask to keep important channels
         selected_features = x * mask
         
         return selected_features, top_indices
@@ -63,10 +63,10 @@ class ChannelSelector(nn.Module):
 class EnhancedDepthwiseConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
         super().__init__()
-        # 通道选择器
+        # Channel selector
         self.channel_selector = ChannelSelector(in_channels)
         
-        # 深度可分离卷积
+        # Depthwise separable convolution
         self.depthwise = nn.Conv2d(
             in_channels, 
             in_channels,
@@ -76,40 +76,40 @@ class EnhancedDepthwiseConv(nn.Module):
             groups=in_channels
         )
         
-        # 通道重组和投影
+        # Channel reassembly and projection
         self.project = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 1),
             nn.BatchNorm2d(out_channels),
             nn.GELU()
         )
         
-        # 特征增强
+        # Feature enhancement
         self.enhance = nn.Sequential(
             nn.Conv2d(out_channels, out_channels, 1),
             nn.Sigmoid()
         )
 
     def forward(self, x):
-        # 选择重要通道
+        # Select important channels
         selected_x, _ = self.channel_selector(x)
         
-        # 深度可分离卷积
+        # Depthwise separable convolution
         feat = self.depthwise(selected_x)
         
-        # 投影到输出维度
+        # Project to the output dimension
         out = self.project(feat)
         
-        # 特征增强
+        # Feature enhancement
         enhance_weight = self.enhance(out)
         out = out * enhance_weight
         
         return out
 
-# 方向感知特征提取
+# Direction-aware feature extraction
 class DirectionalConv(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        # 水平、垂直、对角线方向的卷积核
+        # Convolution kernels for horizontal, vertical, and diagonal directions
         self.h_conv = nn.Conv2d(channels, channels//4, kernel_size=(1,5), padding=(0,2))
         self.v_conv = nn.Conv2d(channels, channels//4, kernel_size=(5,1), padding=(2,0))
         self.d1_conv = nn.Conv2d(channels, channels//4, kernel_size=3, padding=2, dilation=2)
@@ -124,7 +124,7 @@ class DirectionalConv(nn.Module):
         d2 = self.d2_conv(x)
         return self.act(self.fusion(torch.cat([h,v,d1,d2], dim=1)))
 
-# PCB权重生成器
+# PCB weight generator
 class PCBWeightGenerator(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -143,11 +143,11 @@ class PCBWeightGenerator(nn.Module):
         x = self.conv2(x)
         return self.sigmoid(x)
 
-# 边缘增强模块
+# Edge enhancement module
 class EdgeEnhancer(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        # 拉普拉斯算子近似
+        # Laplacian operator approximation
         self.edge_conv = nn.Conv2d(channels, channels, 3, padding=1, groups=channels)
         self.edge_weight = nn.Parameter(torch.FloatTensor([
             [0, 1, 0],
@@ -164,16 +164,16 @@ class EdgeEnhancer(nn.Module):
         )
         
     def forward(self, x):
-        # 使用预定义权重进行边缘检测
+        # Edge detection using the predefined weights
         self.edge_conv.weight = nn.Parameter(self.edge_weight)
         self.edge_conv.bias = self.edge_bias
         edge = self.edge_conv(x)
-        
-        # 动态融合
+
+        # Dynamic fusion
         gate = self.gate(torch.cat([x, edge], dim=1))
         return x + edge * gate
 
-# 纹理感知模块
+# Texture-aware module
 class TextureAwareModule(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -183,11 +183,11 @@ class TextureAwareModule(nn.Module):
         self.act = nn.GELU()
         
     def forward(self, x):
-        texture1 = self.conv1(x) - x  # 提取纹理变化
+        texture1 = self.conv1(x) - x  # extract texture variations
         texture2 = self.conv2(x) - x
         return self.act(self.fusion(torch.cat([texture1, texture2], dim=1)))
 
-# 自适应阈值注意力
+# Adaptive threshold attention
 class AdaptiveThresholdAttention(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -197,35 +197,35 @@ class AdaptiveThresholdAttention(nn.Module):
         
     def forward(self, x):
         avg = self.pool(x)
-        diff = torch.abs(x - avg)  # 局部差异
+        diff = torch.abs(x - avg)  # local difference
         attention = self.sigmoid(self.conv(torch.cat([x, diff], dim=1)))
         return x * attention
 
-# PCB缺陷上下文模块
+# PCB defect context module
 class PCBDefectContext(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        # 局部特征
+        # Local features
         self.local_branch = nn.Sequential(
             nn.Conv2d(channels, channels, 3, padding=1, groups=channels),
             nn.BatchNorm2d(channels),
             nn.ReLU()
         )
-        # 全局特征
+        # Global features
         self.global_branch = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(channels, channels, 1),
             nn.Sigmoid()
         )
-        # 特征融合
+        # Feature fusion
         self.fusion = nn.Conv2d(channels*2, channels, 1)
-        
+
     def forward(self, x):
         local_feat = self.local_branch(x)
         global_feat = self.global_branch(x)
         return self.fusion(torch.cat([local_feat, local_feat*global_feat], dim=1))
 
-# 噪声鲁棒性增强
+# Noise robustness enhancement
 class DenoiseModule(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -249,90 +249,90 @@ class AMSF(nn.Module):
         self.out_channels = out_channels
         mid_channels = in_channels//4
         
-        # # 级联卷积 - 使用深度可分离卷积减少参数量
+        # # Cascade convolution - use depthwise separable convolution to reduce parameters
         # self.conv0 = EnhancedDepthwiseConv(in_channels, mid_channels, 3, 1, 1)
         # self.conv1 = ConvNormLayer(mid_channels, mid_channels, kernel_size=3, padding=1)
         # self.conv2 = ConvNormLayer(mid_channels, mid_channels, kernel_size=3, padding=1)
         # self.conv3 = ConvNormLayer(mid_channels, mid_channels, kernel_size=3, padding=1)
         
-        # 方向感知特征提取 - 针对PCB中的线路断路等缺陷
+        # Direction-aware feature extraction - for defects such as broken traces on PCBs
         # self.directional_conv = DirectionalConv(mid_channels)
         
-        # 改进的权重生成网络 - 更精细的权重分配
+        # Improved weight generation network - finer weight allocation
         # self.weight_conv1 = PCBWeightGenerator(mid_channels*3, mid_channels)
         # self.weight_conv2 = PCBWeightGenerator(mid_channels*3, mid_channels)
         # self.weight_conv3 = PCBWeightGenerator(mid_channels*3, mid_channels)
         
-        # 特征融合 - 修改输出通道数为in_channels
+        # Feature fusion - change the output channels to in_channels
         # self.conv_last = nn.Conv2d(3 * mid_channels, in_channels, kernel_size=1)
-        # self.residual_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)  # 修改输出通道数
-        # self.norm = nn.BatchNorm2d(in_channels)  # 修改归一化层的通道数
+        # self.residual_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)  # change the output channels
+        # self.norm = nn.BatchNorm2d(in_channels)  # change the normalization layer channels
         
-        # 边缘增强模块 - 增强PCB线路边缘特征
+        # Edge enhancement module - enhance PCB trace edge features
         self.edge_enhancer = EdgeEnhancer(in_channels)
         
-        # 纹理感知模块 - 检测PCB表面异常
+        # Texture-aware module - detect PCB surface anomalies
         self.texture_module = TextureAwareModule(in_channels)
         
-        # 自适应阈值注意力 - 处理PCB不同区域亮度差异
+        # Adaptive threshold attention - handle brightness differences across PCB regions
         # self.threshold_attn = AdaptiveThresholdAttention(in_channels)
         
-        # 局部-全局特征整合 - 综合分析PCB缺陷
+        # Local-global feature integration - comprehensive analysis of PCB defects
         # self.pcb_context = PCBDefectContext(in_channels)
         
-        # 噪声鲁棒性增强 - 处理PCB图像噪声
+        # Noise robustness enhancement - handle PCB image noise
         # self.denoise_module = DenoiseModule(in_channels)
 
     def forward(self, x, level=None):
-        # 残差连接
+        # Residual connection
         # residual = self.residual_conv(x)
-        
-        # # 通道压缩
+
+        # # Channel compression
         # x = self.conv0(x)
-        
-        # # 级联特征提取
+
+        # # Cascade feature extraction
         # x3 = self.conv1(x)
         # x5 = self.conv2(x3)
         # x7 = self.conv3(x5)
-        
-        # # 方向特征提取
+
+        # # Directional feature extraction
         # dir_feat = self.directional_conv(x7)
         # x7 = x7 + dir_feat
         
-        # # 最大池化提取显著特征
+        # # Max pooling to extract the most salient features
         # x3_mp, _ = torch.max(x3, dim=1, keepdim=True)
         # x5_mp, _ = torch.max(x5, dim=1, keepdim=True)
         # x7_mp, _ = torch.max(x7, dim=1, keepdim=True)
         
-        # # 特征融合
+        # # Feature fusion
         # x_cat = torch.cat([x3, x5, x7], dim=1)
         
-        # # 动态权重生成
+        # # Dynamic weight generation
         # w3 = self.weight_conv1(x_cat, x3_mp)
         # w5 = self.weight_conv2(x_cat, x5_mp)
         # w7 = self.weight_conv3(x_cat, x7_mp)
         
-        # # 加权融合并恢复通道数
+        # # Weighted fusion and restore the number of channels
         # y = self.conv_last(torch.cat([w3*x3, w5*x5, w7*x7], dim=1))
         
-        # 边缘增强
+        # Edge enhancement
         y = self.edge_enhancer(x)
-        
-        # 纹理感知
+
+        # Texture perception
         texture_feat = self.texture_module(y)
         y = y + texture_feat
-        
-        # # 自适应阈值注意力 (消融：关闭)
+
+        # # Adaptive threshold attention (ablation: disabled)
         # y = self.threshold_attn(y)
-        
-        # # 去噪处理 (消融：关闭)
+
+        # # Denoising (ablation: disabled)
         # y = self.denoise_module(y)
-        
-        # # PCB缺陷上下文整合 (消融：关闭)
+
+        # # PCB defect context integration (ablation: disabled)
         # defect_context = self.pcb_context(y)
         # y = y + defect_context
-        
-        # 归一化和残差连接
+
+        # Normalization and residual connection
         # y = self.norm(y)
         # y += residual
         

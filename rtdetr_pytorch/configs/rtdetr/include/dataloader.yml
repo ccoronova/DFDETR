@@ -19,7 +19,7 @@ train_dataloader:
         - {type: SanitizeBoundingBox, min_size: 1}
         - {type: ConvertBox, out_fmt: 'cxcywh', normalize: True}
   shuffle: True
-  batch_size: 8  # 减小批量大小以解决CUDA内存不足问题
+  batch_size: 8  # Reduced batch size to work around CUDA out-of-memory
   num_workers: 8
   collate_fn: default_collate_fn
 

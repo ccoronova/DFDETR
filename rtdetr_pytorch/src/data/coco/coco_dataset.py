@@ -34,11 +34,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.return_masks = return_masks
         self.remap_mscoco_category = remap_mscoco_category
 
-         # # 按字母顺序生成 mscoco_category2label
+         # # Build mscoco_category2label alphabetically
        #  sorted_categories = sorted(mscoco_category2name.items(), key=lambda x: x[1])
        #  self.mscoco_category2label = {cat_id: idx for idx, (cat_id, _) in enumerate(sorted_categories)}
-       #  # 打印类别顺序
-       #  print("训练类别顺序：")
+       #  # Print the category order
+       #  print("Training category order: ")
        #  for cat_id, cat_name in sorted(mscoco_category2name.items(), key=lambda x: x[1]):
        #      print(f"ID: {cat_id}, Name: {cat_name}, Label: {mscoco_category2label[cat_id]}")
     def __getitem__(self, idx):
@@ -116,7 +116,7 @@ class ConvertCocoPolysToMask(object):
             classes = [obj["category_id"] for obj in anno]
         #
         # if self.remap_mscoco_category:
-        #     # 使用 CocoDetection 类中定义的 mscoco_category2label
+        # use the mscoco_category2label defined in the CocoDetection class
         #     classes = [self.mscoco_category2label[obj["category_id"]] for obj in anno]
         # else:
         #     classes = [obj["category_id"]] for obj in anno]
@@ -164,19 +164,19 @@ class ConvertCocoPolysToMask(object):
         return image, target
 
 
-mscoco_category2name = {}  # 由 set_dataset_categories() 或 train.py 注入
+mscoco_category2name = {}  # injected by set_dataset_categories() or train.py
 mscoco_category2label = {}
 mscoco_label2category = {}
 
 
 def set_dataset_categories(categories: dict):
-    """由 train.py 在训练前调用，注入当前数据集的类别映射"""
+    """Called by train.py before training to inject the current dataset category mapping"""
     global mscoco_category2name, mscoco_category2label, mscoco_label2category
     mscoco_category2name = dict(categories)
     mscoco_category2label = {k: i for i, k in enumerate(mscoco_category2name.keys())}
     mscoco_label2category = {v: k for k, v in mscoco_category2label.items()}
 
-    # 同步更新 __init__.py 的引用，否则 rtdetr_postprocessor 拿到的还是空 {}
+    # Keep the __init__.py references in sync, otherwise rtdetr_postprocessor still sees an empty {}
     import src.data.coco as coco_pkg
     coco_pkg.mscoco_category2name = mscoco_category2name
     coco_pkg.mscoco_category2label = mscoco_category2label

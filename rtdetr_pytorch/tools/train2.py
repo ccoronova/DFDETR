@@ -11,7 +11,7 @@ from src.core import YAMLConfig
 from src.solver import TASKS
 import warnings
 
-# 忽略特定的警告
+# Ignore specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, message=".*image size.*")
 
 
@@ -24,21 +24,21 @@ def main(args, ) -> None:
 
     assert not all([args.tuning, args.resume]), \
         'Only support from_scrach or resume or tuning at one time'
-#读取配置信息
+# Read the configuration
     cfg = YAMLConfig(
         args.config,
         resume=args.resume,
         use_amp=args.amp,
         tuning=args.tuning
     )
-#根据任务配置模型，优化器
+    # Configure the model and optimizer according to the task
     solver = TASKS[cfg.yaml_cfg['task']](cfg)
 
     if args.test_only:
-        #如果是验证任务，执行val
+        # If it is a validation task, run validation
         solver.val()
     else:
-        #执行训练任务
+        # Run the training task
         solver.fit()
 
 

@@ -1,4 +1,4 @@
-"""统一推理脚本 —— 改顶部 DATASET 变量即可切换数据集"""
+"""Unified inference script -- change the DATASET variable at the top to switch datasets."""
 import torch
 import torch.nn as nn
 import torchvision.transforms as T
@@ -13,18 +13,18 @@ from src.core import YAMLConfig
 from src.solver import TASKS
 
 # ============================================================
-# 切换数据集：改这一个变量即可（可选值见 dataset_registry.py）
+# Switch dataset: change this single variable (see dataset_registry.py for options)
 # ============================================================
 DATASET = 'deeppcb'  # pcb | deeppcb | pcb-aol | neu-det | new-gc-net
 
 # ============================================================
-# 权重路径（空字符串 = 自动用注册表默认，填了则覆盖）
+# Weight path (empty string = use the registry default; if filled, it overrides)
 # ============================================================
-WEIGHT_PATH = 'outputs/deeppcb/best_map50.pth'  # 例如: 'outputs/best_map50.pth'
+WEIGHT_PATH = 'outputs/deeppcb/best_map50.pth'  # e.g. 'outputs/best_map50.pth'
 
 
 # ===========================================================================
-# 工具函数
+# Utility functions
 # ===========================================================================
 
 def postprocess(labels, boxes, scores, iou_threshold=0.7):
@@ -120,7 +120,7 @@ def merge_predictions(predictions, slice_coordinates, orig_image_size, slice_wid
 
 
 def load_model(cfg, checkpoint_path):
-    """加载模型"""
+    """Load the model"""
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     if 'ema' in checkpoint:
         state_dict = checkpoint['ema']['module']
@@ -135,7 +135,7 @@ def load_model(cfg, checkpoint_path):
 
 
 # ===========================================================================
-# 绘图（每个数据集保持原有的字体大小 & 颜色）
+# Drawing (keep each dataset's original font size & colors)
 # ===========================================================================
 
 def draw(images, labels_list, boxes_list, scores_list, ds, thrh,
@@ -158,13 +158,13 @@ def draw(images, labels_list, boxes_list, scores_list, ds, thrh,
             filtered_boxes = box[filtered_indices]
             filtered_scores = scr[filtered_indices]
 
-            log_file.write(f"图像 {image_names[i]} 的检测结果：\n")
+            log_file.write(f"Detection results for image {image_names[i]}:\n")
             if len(filtered_labels) == 0:
-                log_file.write("  无有效检测结果\n")
+                log_file.write("  No valid detections\n")
             else:
                 for lbl, scr_val, bbox in zip(filtered_labels, filtered_scores, filtered_boxes):
                     name = label_mapping.get(int(lbl), 'Unknown')
-                    log_file.write(f"  标签: {name} 分数: {scr_val:.2f} 位置: {bbox.tolist()}\n")
+                    log_file.write(f"  Label: {name} Score: {scr_val:.2f} Location: {bbox.tolist()}\n")
 
             drawn_text_areas = []
             im_width, im_height = im.size
@@ -174,7 +174,7 @@ def draw(images, labels_list, boxes_list, scores_list, ds, thrh,
                 label_name = label_mapping.get(label_id, 'Unknown')
                 color = color_mapping.get(label_id, "#FF0000")
 
-                # 字体
+                # Font
                 try:
                     font = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", font_size)
                 except Exception:
@@ -237,11 +237,11 @@ def draw(images, labels_list, boxes_list, scores_list, ds, thrh,
 
 
 # ===========================================================================
-# 主逻辑
+# Main logic
 # ===========================================================================
 
 def main(args):
-    # ---------- 加载数据集配置 ----------
+    # ---------- Load dataset config ----------
     from configs.dataset.dataset_registry import get_dataset
     ds = get_dataset(DATASET)
 
@@ -284,14 +284,14 @@ def main(args):
     scores_list = []
     image_names = []
 
-    # 支持单张图片或目录
+    # Support a single image or a directory
     if os.path.isdir(args.im_dir):
         image_list = [os.path.join(args.im_dir, f) for f in os.listdir(args.im_dir)
                       if f.lower().endswith((".png", ".jpg", ".jpeg"))]
     elif os.path.isfile(args.im_dir):
         image_list = [args.im_dir]
     else:
-        raise ValueError(f"{args.im_dir} 不是有效的文件或目录")
+        raise ValueError(f"{args.im_dir} is not a valid file or directory")
 
     for im_path in image_list:
         image_name = os.path.basename(im_path)
@@ -317,7 +317,7 @@ def main(args):
          path=args.output_dir, image_names=image_names)
     print("Results saved.")
 
-    # ---------- DETECTION_RESULTS 结构化输出（给外部程序解析） ----------
+    # ---------- DETECTION_RESULTS structured output (for external programs to parse) ----------
     label_mapping = ds['label_mapping']
     for i in range(len(images)):
         labels_np = labels_list[i].detach().cpu().numpy()
@@ -345,10 +345,10 @@ def main(args):
                     xmin, ymin, xmax, ymax = [int(b) for b in bbox_scalar]
                     valid_detections.append((name, scr_scalar, xmin, ymin, xmax, ymax))
                 except Exception as e:
-                    print(f"处理边界框出错: {e}, bbox类型: {type(bbox)}, 值: {bbox}")
+                    print(f"Error processing bounding box: {e}, bbox type: {type(bbox)}, value: {bbox}")
 
         valid_detections.sort(key=lambda x: x[1], reverse=True)
-        print(f"\n图像 {image_names[i]} 检测到 {len(valid_detections)} 个目标:")
+        print(f"\nImage {image_names[i]} detected {len(valid_detections)} target(s):")
         print("----- DETECTION_RESULTS_BEGIN -----")
         for name, scr_val, xmin, ymin, xmax, ymax in valid_detections:
             print(f"{name},{scr_val:.3f},{xmin},{ymin},{xmax},{ymax}")
@@ -356,7 +356,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    # 权重：WEIGHT_PATH 为空则取注册表默认
+    # Weight: if WEIGHT_PATH is empty, use the registry default
     from configs.dataset.dataset_registry import get_dataset
     ds = get_dataset(DATASET)
     weight_default = WEIGHT_PATH if WEIGHT_PATH else ds.get('weight_path', '')
@@ -365,13 +365,13 @@ if __name__ == '__main__':
                         default=r'configs/rtdetr/rtdetr_r18vd_6x_coco.yml')
     parser.add_argument('-r', '--resume', type=str,
                         default=weight_default,
-                        help=f"权重文件路径（默认: {weight_default}）")
+                        help=f"Weight file path (default: {weight_default})")
     parser.add_argument('-d', '--device', type=str, default='cuda')
     parser.add_argument('--im-dir', type=str,
                         default=ds.get('im_dir', ''),
-                        help="图片目录或单张图片路径")
+                        help="Image directory or a single image path")
 
-    # 如果提供了权重路径，则默认在权重所在目录下创建一个名为 inference_results 的文件夹作为输出目录
+    # If a weight path is provided, default to a folder named inference_results next to it as the output directory
     if weight_default:
         weight_dir = os.path.dirname(weight_default)
         default_output_dir = os.path.join(weight_dir, 'inference_results')
@@ -380,8 +380,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-o', '--output-dir', type=str,
                         default=default_output_dir,
-                        help=f"输出目录（默认: {default_output_dir}）")
-    parser.add_argument('--conf', type=float, default=0.3, help="置信度阈值")
-    parser.add_argument('--iou', type=float, default=0.7, help="IOU 阈值")
+                        help=f"Output directory (default: {default_output_dir})")
+    parser.add_argument('--conf', type=float, default=0.3, help="Confidence threshold")
+    parser.add_argument('--iou', type=float, default=0.7, help="IOU threshold")
     args = parser.parse_args()
     main(args)

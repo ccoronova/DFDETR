@@ -14,7 +14,7 @@ from src.nn.backbone import PResNet
 from src.zoo.rtdetr import HybridEncoder, RTDETRTransformer, RTDETR
 
 
-# --------- 用户可改参数 ---------
+# --------- User-adjustable parameters ---------
 WEIGHTS_PATH = 'outputs/best_map50.pth'
 INPUT_SIZE = 640
 NUM_CLASSES = 6
@@ -27,7 +27,7 @@ USE_AMP = True
 def _extract_state_dict(ckpt: object) -> dict:
     """Best-effort extraction of state_dict from common checkpoint formats."""
     if isinstance(ckpt, dict):
-        # 常见保存格式：{'model': ...} 或 {'ema': {'module': ...}} 等
+        # Common save formats: {'model': ...} or {'ema': {'module': ...}} etc.
         if 'ema' in ckpt and ckpt['ema'] is not None:
             ema = ckpt['ema']
             if isinstance(ema, dict) and 'module' in ema and isinstance(ema['module'], dict):
@@ -37,7 +37,7 @@ def _extract_state_dict(ckpt: object) -> dict:
         for k in ("model", "state_dict", "net"):
             if k in ckpt and isinstance(ckpt[k], dict):
                 return ckpt[k]
-        # 可能直接就是 state_dict
+        # It may be the state_dict directly
         if ckpt and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
             return ckpt
         return ckpt
@@ -45,10 +45,10 @@ def _extract_state_dict(ckpt: object) -> dict:
 
 
 def build_rtdetr_model(input_size: int = INPUT_SIZE, num_classes: int = NUM_CLASSES) -> torch.nn.Module:
-    """按你当前工程的网络结构构建 RT-DETR。"""
+    """Build RT-DETR according to the network structure of your current project."""
     backbone = PResNet(depth=18, freeze_norm=False, pretrained=False, return_idx=[1, 2, 3])
 
-    # 注意：HybridEncoder 的实现里依赖 eval_spatial_size 来构建位置编码
+    # Note: the HybridEncoder implementation relies on eval_spatial_size to build position encodings
     encoder = HybridEncoder(
         in_channels=[128, 256, 512],
         feat_strides=[8, 16, 32],
@@ -222,7 +222,7 @@ def benchmark(
         max_gpu_mem = 0.0
         reserved_gpu_mem = 0.0
 
-    # 输出 & 保存
+    # Output & save
     lines = []
     lines.append("=" * 60)
     lines.append("RT-DETR Benchmark")
@@ -249,9 +249,9 @@ def benchmark(
         save_dir = Path(weights_path).resolve().parent
         save_path = save_dir / "rtdetr_benchmark.txt"
         save_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"\n结果已保存至: {save_path}")
+        print(f"\nResults saved to: {save_path}")
     except Exception as e:
-        print(f"保存结果失败: {e}")
+        print(f"Failed to save results: {e}")
 
 
 if __name__ == "__main__":

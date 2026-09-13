@@ -63,7 +63,7 @@ class CocoEvaluator(object):
     def accumulate(self):
         for coco_eval in self.coco_eval.values():
             coco_eval.accumulate()
-#打印结果
+# Print results
     def summarize(self):
         for iou_type, coco_eval in self.coco_eval.items():
             print("IoU metric: {}".format(iou_type))

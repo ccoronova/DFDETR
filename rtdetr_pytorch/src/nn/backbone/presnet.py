@@ -15,7 +15,7 @@ from src.core import register
 
 __all__ = ['PResNet']
 
-#cfg字典定义了不同深度的resnet模型中的每个阶段的残差块数量
+# The cfg dict defines the number of residual blocks per stage for ResNet models of different depths
 ResNet_cfg = {
     18: [2, 2, 2, 2],
     34: [3, 4, 6, 3],
@@ -24,7 +24,7 @@ ResNet_cfg = {
     # 152: [3, 8, 36, 3],
 }
 
-#预训练权重下载链接
+# Pretrained weight download links
 donwload_url = {
     18: 'https://github.com/lyuwenyu/storage/releases/download/v0.1/ResNet18_vd_pretrained_from_paddle.pth',
     34: 'https://github.com/lyuwenyu/storage/releases/download/v0.1/ResNet34_vd_pretrained_from_paddle.pth',
@@ -32,30 +32,30 @@ donwload_url = {
     101: 'https://github.com/lyuwenyu/storage/releases/download/v0.1/ResNet101_vd_ssld_pretrained_from_paddle.pth',
 }
 
-#定义基本残差块
-#basicblock用于浅层的resnet例如r18
+# Define the basic residual block
+# BasicBlock is used for shallow ResNets, e.g., ResNet18
 class BasicBlock(nn.Module):
-    # 输出通道数相对于输入通道数的扩展倍数，为1，相同
+    # Expansion factor of the output channels relative to the input channels, set to 1 (same size)
     expansion = 1
-   #初始化，shortcut，布尔值，指是否使用捷径连接。如果为False，则需要通过额外的卷积层或池化层来调整输入x的形状，以便与主路径的输出相匹配。variant，为指定残差块变种b
+   # init: shortcut is a bool indicating whether to use a skip connection. If False, the input x must be reshaped by an extra conv or pooling layer to match the main-path output. variant specifies the residual block variant 'b'.
     def __init__(self, ch_in, ch_out, stride, shortcut, act='relu', variant='b'):
-        super().__init__() #执行初始化函数逻辑
+        super().__init__() # Execute the initialization logic
 
-        self.shortcut = shortcut   #有就用捷径连接
- #如果没有
+        self.shortcut = shortcut   # Use the skip connection if available
+ # Otherwise
         if not shortcut:
             if variant == 'd' and stride == 2:
-                #顺序组合多个神经网络层，方便在前向传播等过程中依次调用这些层进行计算。ordereddict，有序字典
+                # Sequentially combine multiple neural layers so they can be called in order during forward propagation. OrderedDict is an ordered dictionary.
                 self.short = nn.Sequential(OrderedDict([
-                    #步长为2，代表下采样，ceil_mode设置为ture，代表向上取整
+                    # Stride 2 means downsampling; ceil_mode=True rounds up.
                     ('pool', nn.AvgPool2d(2, 2, 0, ceil_mode=True)),
-                    #卷积核1，用于调整特征图的通道数，步长为1，不会改变特征图的尺寸（除了通道维度）
+                    # 1x1 conv to adjust the number of channels; stride 1 keeps the feature map size (except channel dim).
                     ('conv', ConvNormLayer(ch_in, ch_out, 1, 1))
                 ]))
             else:
-                #传入参数stride作为实际步长值，stride大于1，代表特征图进行下采样操作。
+                # Use the passed stride as the actual stride; a stride greater than 1 downsamples the feature map.
                 self.short = ConvNormLayer(ch_in, ch_out, 1, stride)
-      #卷积操作以及归一化操作
+      # Convolution and normalization operations
         self.branch2a = ConvNormLayer(ch_in, ch_out, 3, stride, act=act)
         self.branch2b = ConvNormLayer(ch_out, ch_out, 3, 1, act=None)
         self.act = nn.Identity() if act is None else get_activation(act)
@@ -74,7 +74,7 @@ class BasicBlock(nn.Module):
 
         return out
 
-#用于深层的resnet（resnet50，resnet101）
+# Used for deep ResNets (ResNet50, ResNet101)
 class BottleNeck(nn.Module):
     expansion = 4
 
@@ -119,7 +119,7 @@ class BottleNeck(nn.Module):
 
         return out
 
-#定义残差块序列，用于resnet的每个阶段
+# Define a sequence of residual blocks for each stage of ResNet
 class Blocks(nn.Module):
     def __init__(self, block, ch_in, ch_out, count, stage_num, act='relu', variant='b'):
         super().__init__()
@@ -145,7 +145,7 @@ class Blocks(nn.Module):
             out = block(out)
         return out
 
-#定义presnet模型
+# Define the PResNet model
 @register
 class PResNet(nn.Module):
     def __init__(
@@ -206,12 +206,12 @@ class PResNet(nn.Module):
             self.load_state_dict(state)
             print(f'Load PResNet{depth} state_dict')
 
-          #辅助函数
-        #冻结模块参数，用于冻结给定模块参数，使其不再更新
+          # Helper functions
+        # Freeze module parameters so the given module's parameters are no longer updated
     def _freeze_parameters(self, m: nn.Module):
         for p in m.parameters():
             p.requires_grad = False
-#冻结批量归一化层，递归遍历模型，将所有的批量归一化层替换为冻结的批量归一化层
+# Freeze batch norm layers: recursively traverse the model and replace every batch norm layer with a frozen one
     def _freeze_norm(self, m: nn.Module):
         if isinstance(m, nn.BatchNorm2d):
             m = FrozenBatchNorm2d(m.num_features)
@@ -223,7 +223,7 @@ class PResNet(nn.Module):
         return m
 
     def forward(self, x):
-        # print("PResNet_forward中x", x.shape)
+        # print("x in PResNet_forward", x.shape)
         conv1 = self.conv1(x)
         # print("conv1", conv1.shape)
 

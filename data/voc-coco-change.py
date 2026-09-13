@@ -5,12 +5,12 @@ import random
 import xml.etree.ElementTree as ET
 from sklearn.model_selection import train_test_split
 
-# 数据集路径
+# Dataset path
 dataset_path = os.path.dirname(os.path.abspath(__file__))
 annotations_path = os.path.join(dataset_path, "annotations")
 images_path = os.path.join(dataset_path, "images")
 
-# 创建train, val, test文件夹
+# Create train, val, test folders
 train_dir = os.path.join(dataset_path, "train")
 val_dir = os.path.join(dataset_path, "val")
 test_dir = os.path.join(dataset_path, "test")
@@ -18,11 +18,11 @@ os.makedirs(train_dir, exist_ok=True)
 os.makedirs(val_dir, exist_ok=True)
 os.makedirs(test_dir, exist_ok=True)
 
-# 划分比例
+# Split ratios
 train_ratio = 0.7
-val_ratio = 0.2  # test_ratio将为0.1
+val_ratio = 0.2  # test_ratio will be 0.1
 
-# 固定类别映射关系
+# Fixed category mapping
 category_map = {
     "missing_hole": 1,
     "mouse_bite": 2,
@@ -33,12 +33,12 @@ category_map = {
 }
 
 
-# 划分数据集
+# Split the dataset
 image_files = os.listdir(images_path)
 train_files, test_files = train_test_split(image_files, test_size=1 - train_ratio)
 val_files, test_files = train_test_split(test_files, test_size=0.5)
 
-# 移动文件到相应的目录
+# Move files into their corresponding directories
 for file in train_files:
     shutil.move(os.path.join(images_path, file), os.path.join(train_dir, file))
 for file in val_files:
@@ -116,7 +116,7 @@ def voc_to_coco(xml_files, image_dir, output_json, category_map):
         coco_data["annotations"].extend(annotations)
         image_id += 1
 
-    # 按要求设置 `categories`
+    # Build the `categories` as required
     for category_name, category_id in category_map.items():
         coco_data["categories"].append({
             "id": category_id,
@@ -128,7 +128,7 @@ def voc_to_coco(xml_files, image_dir, output_json, category_map):
         json.dump(coco_data, f, indent=4)
 
 
-# 分别生成train.json、val.json、test.json
+# Generate train.json, val.json and test.json separately
 def generate_annotations(split_files, split_dir, output_json):
     xml_files = [file.replace(".jpg", ".xml") for file in split_files]
     voc_to_coco(xml_files, split_dir, output_json, category_map)

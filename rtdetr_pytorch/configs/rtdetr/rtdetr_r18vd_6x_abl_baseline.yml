@@ -7,9 +7,9 @@ __include__: [
 ]
 
 # =============================================================
-# 消融: RT-DETR 基线（关闭所有增强模块）
-# 对应论文 Table 4 第一行 (mAP50 = 95.7 on PCB-DATASET)
-# 数据集: PCB-DATASET (train.py 中 DATASET='pcb')
+# Ablation: RT-DETR baseline (all enhancement modules disabled)
+# Corresponds to Table 4, first row of the paper (mAP50 = 95.7 on PCB-DATASET)
+# Dataset: PCB-DATASET (DATASET='pcb' in train.py)
 # =============================================================
 output_dir: outputs/rtdetr_r18vd_abl_baseline
 

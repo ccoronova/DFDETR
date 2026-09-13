@@ -1,6 +1,6 @@
 """
-数据集注册中心 —— Linux 版
-换电脑只需改这一个文件里的路径
+Dataset registry center -- Linux version
+When switching machines, only edit the paths in this file
 """
 
 DATASETS = {
@@ -18,7 +18,7 @@ DATASETS = {
             5: 'spur',
             6: 'spurious_copper',
         },
-        # ---- 推理可视化 ----
+        # ---- Inference visualization ----
         'weight_path': r'D:\user\detr code\rtdetr code-1\rtdetr code-1\out\pacdataset\best_map50.pth',
         'im_dir': r'd:\user\detr code\three\infer\pcb-dataset',
         'output_dir': r'D:\user\detr code\rtdetr code-1\rtdetr code-1\out\pacdataset\you\infer-chu',
@@ -56,7 +56,7 @@ DATASETS = {
             5: 'copper',
             6: 'pin-hole',
         },
-        # ---- 推理可视化 ----
+        # ---- Inference visualization ----
         'weight_path': r'D:\user\detr code\rtdetr code-1\rtdetr code-1\out\deeppcb\best_map50.pth',
         'im_dir': r'd:\user\detr code\three\infer\deeppcb',
         'output_dir': r'D:\user\detr code\rtdetr code-1\rtdetr code-1\out\deeppcb\you\infer1',
@@ -69,12 +69,12 @@ DATASETS = {
             5: 'pin-hole',
         },
         'color_mapping': {
-            0: "#0000FF",  # open - 蓝色
-            1: "#FF00FF",  # short - 品红
-            2: "#00FF00",  # mousebite - 绿色
-            3: "#00FFFF",  # spur - 青色
-            4: "#FF0000",  # copper - 红色
-            5: "#FFFF00",  # pin-hole - 黄色
+            0: "#0000FF",  # open - blue
+            1: "#FF00FF",  # short - magenta
+            2: "#00FF00",  # mousebite - green
+            3: "#00FFFF",  # spur - cyan
+            4: "#FF0000",  # copper - red
+            5: "#FFFF00",  # pin-hole - yellow
         },
         'font_size': 30,
         'draw_thresh': 0.8,
@@ -176,7 +176,7 @@ DATASETS = {
     },
 
     'apspc': {
-        'num_classes': 0,  # TODO: 填类别数 + categories
+        'num_classes': 0,  # TODO: fill in num_classes + categories
         'train_img_folder': r'/home/user/user/rtdetr code1/RT-DETR-main/APSPC-COCO/coco/images/train/',
         'train_ann_file': r'/home/user/user/rtdetr code1/RT-DETR-main/APSPC-COCO/coco/annotations/instances_train.json',
         'val_img_folder': r'/home/user/user/rtdetr code1/RT-DETR-main/APSPC-COCO/coco/images/val/',
@@ -192,10 +192,10 @@ DATASETS = {
     },
 
     'pcb-defect': {
-        'num_classes': 0,  # TODO: 填类别数 + categories
+        'num_classes': 0,  # TODO: fill in num_classes + categories
         'train_img_folder': r'/home/user/user/rtdetr code1/RT-DETR-main/pcb-defect-dataset/train/images',
         'train_ann_file': r'/home/user/user/rtdetr code1/RT-DETR-main/pcb-defect-dataset/annotations/instances_train.json',
-        'val_img_folder': r'/home/user/user/rtdetr code1/RT-DETR-main/pcb-defect-dataset',  # TODO: 确认 val 图片目录
+        'val_img_folder': r'/home/user/user/rtdetr code1/RT-DETR-main/pcb-defect-dataset',  # TODO: confirm the val image directory
         'val_ann_file': r'/home/user/user/rtdetr code1/RT-DETR-main/pcb-defect-dataset/annotations/instances_val.json',
         'categories': {},  # TODO
         'weight_path': '',  # TODO
@@ -210,7 +210,7 @@ DATASETS = {
 
 
 def get_dataset(name: str):
-    """返回数据集配置；未找到时报错并列出可选名称"""
+    """Return the dataset config; raise an error with available names if not found"""
     if name not in DATASETS:
-        raise KeyError(f"未知数据集 '{name}'，可选: {list(DATASETS.keys())}")
+        raise KeyError(f"Unknown dataset '{name}', available: {list(DATASETS.keys())}")
     return DATASETS[name]

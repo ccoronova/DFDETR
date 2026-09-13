@@ -9,7 +9,7 @@ from typing import Iterable
 from pathlib import Path
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # 避免需要图形界面
+matplotlib.use('Agg')  # Avoid requiring a graphical interface
 import matplotlib.pyplot as plt
 import json
 import traceback
@@ -23,7 +23,7 @@ from src.misc import dist
 from src.data import CocoEvaluator
 from src.misc import (MetricLogger, SmoothedValue, reduce_dict)
 
-# 添加JSON编码器以处理NumPy类型
+# Add a JSON encoder to handle NumPy types
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -45,7 +45,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     # metric_logger.add_meter('class_error', SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = kwargs.get('print_freq', 10)
-    
+
     ema = kwargs.get('ema', None)
     scaler = kwargs.get('scaler', None)
 
@@ -53,22 +53,22 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        # 增加梯度累积因子，模拟更大的batch size
-        accumulate_grad_steps = kwargs.get('accumulate_grad_steps', 2)  # 默认累积2次梯度
+        # Add a gradient accumulation factor to simulate a larger batch size
+        accumulate_grad_steps = kwargs.get('accumulate_grad_steps', 2)  # Accumulate 2 steps by default
         do_optimizer_step = kwargs.get('_accumulation_step', 0) % accumulate_grad_steps == 0
-        
+
         if scaler is not None:
             with torch.autocast(device_type=str(device), cache_enabled=True):
                 outputs = model(samples, targets)
-            
+
             with torch.autocast(device_type=str(device), enabled=False):
                 loss_dict = criterion(outputs, targets)
 
             loss = sum(loss_dict.values())
-            # 根据梯度累积因子调整损失
+            # Scale the loss by the gradient accumulation factor
             loss = loss / accumulate_grad_steps
             scaler.scale(loss).backward()
-            
+
             if do_optimizer_step:
                 if max_norm > 0:
                     scaler.unscale_(optimizer)
@@ -77,27 +77,27 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             if do_optimizer_step:
                 scaler.step(optimizer)
                 scaler.update()
-                # 更新计数器
+                # Update the counter
                 kwargs['_accumulation_step'] = 0
             else:
-                # 增加累积计数
+                # Increase the accumulation counter
                 kwargs['_accumulation_step'] = kwargs.get('_accumulation_step', 0) + 1
             optimizer.zero_grad()
 
         else:
             outputs = model(samples, targets)
             loss_dict = criterion(outputs, targets)
-            
+
             loss = sum(loss_dict.values())
             optimizer.zero_grad()
             loss.backward()
-            
+
             if max_norm > 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
 
             optimizer.step()
-        
-        # ema 
+
+        # ema
         if ema is not None:
             ema.update(model)
 
@@ -163,7 +163,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
         #                      **loss_dict_reduced_unscaled)
         # metric_logger.update(class_error=loss_dict_reduced['class_error'])
 
-        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)        
+        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results = postprocessors(outputs, orig_target_sizes)
         # results = postprocessors(outputs, targets)
 
@@ -200,7 +200,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
     # panoptic_res = None
     # if panoptic_evaluator is not None:
     #     panoptic_res = panoptic_evaluator.summarize()
-    
+
     stats = {}
     # stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if coco_evaluator is not None:
@@ -208,7 +208,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
             stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
         if 'segm' in iou_types:
             stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
-            
+
     # if panoptic_res is not None:
     #     stats['PQ_all'] = panoptic_res["All"]
     #     stats['PQ_th'] = panoptic_res["Things"]
@@ -219,14 +219,14 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
 
 def save_and_visualize_eval_results(coco_evaluator, stats, output_dir):
     """
-    保存评估结果并生成可视化图表
-    - 生成一张包含所有类别的PR曲线图（IoU=0.50）
-    - 叠加全类别平均PR曲线
-    输出位置：{output_dir}/eval_visualizations/all_classes_pr_curve.png
+    Save evaluation results and generate visualization charts
+    - Generate a PR curve chart for all classes (IoU=0.50)
+    - Overlay the average PR curve across all classes
+    Output location: {output_dir}/eval_visualizations/all_classes_pr_curve.png
     """
     if not dist.is_main_process():
         return
-    
+
     output_dir = Path(output_dir)
     eval_dir = output_dir / "eval_visualizations"
     eval_dir.mkdir(exist_ok=True, parents=True)
@@ -237,19 +237,19 @@ def save_and_visualize_eval_results(coco_evaluator, stats, output_dir):
     try:
         import matplotlib.pyplot as plt
         import numpy as np
-        
+
         eval_data = coco_evaluator.coco_eval["bbox"].eval
         precisions = eval_data['precision']  # [T, R, K, A, M]
         params = coco_evaluator.coco_eval["bbox"].params
         cat_ids = params.catIds
         recalls = params.recThrs  # [R] 0:.01:1
 
-        # 获取类别名称
+        # Get the class names
         from src.data.coco.coco_dataset import mscoco_category2name
         fallback_names = ['missing_hole', 'mouse_bite', 'open_circuit', 'short', 'spur', 'spurious_copper']
-        
-        # 仅取 IoU=0.50 (index 0), area=all (index 0), maxDet=100 (index 2)
-        iou_index = 0  
+
+        # Only take IoU=0.50 (index 0), area=all (index 0), maxDet=100 (index 2)
+        iou_index = 0
         area_index = 0
         maxdet_index = 2
 
@@ -258,13 +258,13 @@ def save_and_visualize_eval_results(coco_evaluator, stats, output_dir):
         ap50_values = []
 
         for idx, catId in enumerate(cat_ids):
-            # 获取该类别的 precision 曲线 [R]
+            # Get the precision curve [R] for this class
             curve = precisions[iou_index, :, idx, area_index, maxdet_index]
-            
-            # 处理无效值 (-1)
+
+            # Handle invalid values (-1)
             valid_mask = curve > -1
             if not np.any(valid_mask):
-                # 如果全是无效值，填充 NaN
+                # Fill with NaN if all values are invalid
                 curve_processed = np.full_like(curve, np.nan)
                 ap50 = 0.0
             else:
@@ -277,33 +277,33 @@ def save_and_visualize_eval_results(coco_evaluator, stats, output_dir):
             ap50_values.append(ap50)
 
         per_class_curves = np.array(per_class_curves) # [K, R]
-        
-        # 计算所有类别的平均曲线 (Mean PR Curve)
-        # 忽略 NaN 进行平均
+
+        # Compute the mean curve across all classes (Mean PR Curve)
+        # Average ignoring NaN
         mean_curve = np.nanmean(per_class_curves, axis=0)
-        
-        # 获取整体 mAP@0.50
+
+        # Get the overall mAP@0.50
         bbox_stats = coco_evaluator.coco_eval["bbox"].stats
         map50 = bbox_stats[1] if bbox_stats is not None else 0.0
 
-        # --- 绘图 ---
+        # --- Plotting ---
         plt.figure(figsize=(8, 8))
-        
-        # 使用 tab20 颜色图，支持更多类别颜色区分
+
+        # Use the tab20 colormap to support more distinct class colors
         cmap = plt.get_cmap('tab20')
         colors = [cmap(i % 20) for i in range(len(class_names))]
 
-        # 绘制每个类别的曲线
+        # Plot the curve for each class
         for i, (name, curve, ap) in enumerate(zip(class_names, per_class_curves, ap50_values)):
-            # 如果整条曲线都是 NaN，则不绘制
+            # Skip if the entire curve is NaN
             if np.all(np.isnan(curve)):
                 continue
-                
-            plt.plot(recalls, curve, label=f'{name} (AP={ap:.3f})', 
+
+            plt.plot(recalls, curve, label=f'{name} (AP={ap:.3f})',
                      color=colors[i], linewidth=1.5, alpha=0.7)
 
-        # 绘制平均曲线 (Overall)
-        plt.plot(recalls, mean_curve, label=f'All Classes (mAP@0.50={map50:.3f})', 
+        # Plot the average curve (Overall)
+        plt.plot(recalls, mean_curve, label=f'All Classes (mAP@0.50={map50:.3f})',
                  color='b', linewidth=3, linestyle='-')
 
         plt.xlabel('Recall')
@@ -312,12 +312,12 @@ def save_and_visualize_eval_results(coco_evaluator, stats, output_dir):
         plt.grid(True, alpha=0.3)
         plt.xlim(0, 1.0)
         plt.ylim(0, 1.05)
-        
+
         plt.gca().set_aspect('equal', adjustable='box')
-        # 图例放在外侧或者调整大小，避免遮挡
+        # Place the legend outside or resize the layout to avoid overlap
         if len(class_names) > 10:
             plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-            plt.tight_layout(rect=[0, 0, 0.85, 1]) # 调整布局留出图例空间
+            plt.tight_layout(rect=[0, 0, 0.85, 1]) # Adjust the layout to leave room for the legend
         else:
             plt.legend(loc='best')
             plt.tight_layout()
@@ -325,13 +325,13 @@ def save_and_visualize_eval_results(coco_evaluator, stats, output_dir):
         save_path = eval_dir / "all_classes_pr_curve.png"
         plt.savefig(save_path, dpi=300)
         plt.close()
-        print(f"✓ 综合PR曲线已生成: {save_path}")
-        
-        # 保存简要AP结果
+        print(f"Combined PR curve generated: {save_path}")
+
+        # Save a brief summary of AP results
         with open(eval_dir / "ap_results.json", "w") as f:
             json.dump({name: {'AP@0.50': ap} for name, ap in zip(class_names, ap50_values)}, f, indent=4, cls=NumpyEncoder)
 
     except Exception as e:
-        print(f"绘图失败: {e}")
+        print(f"Failed to plot: {e}")
         import traceback
         traceback.print_exc()

@@ -21,7 +21,8 @@ from src.core import register
 __all__ = ['RTDETRTransformer']
 
 
-#MLP 模块是一个多层感知机，包含多个全连接层。其输入、隐藏层和输出层的维度可以在初始化时指定。每一层之间都有一个激活函数（默认为 ReLU）。
+# MLP is a multi-layer perceptron composed of fully-connected layers. The dimensions of the input, hidden and
+# output layers can be specified at init time. An activation (ReLU by default) is applied between layers.
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers, act='relu'):
         super().__init__()
@@ -36,7 +37,8 @@ class MLP(nn.Module):
         return x
 
 
-#MSDeformableAttention 实现了多尺度的变形注意力机制。该机制根据输入的查询（query）和参考点（reference points）计算加权的值（value），并使用注意力机制对不同尺度的图像区域进行加权。
+# MSDeformableAttention implements multi-scale deformable attention. It computes weighted values from the input
+# queries and reference points, attending to image regions across feature scales.
 class MSDeformableAttention(nn.Module):
     def __init__(self, embed_dim=256, num_heads=8, num_levels=4, num_points=4,):
         """
@@ -141,7 +143,8 @@ class MSDeformableAttention(nn.Module):
 
         return output
 
-# TransformerDecoderLayer 是一个标准的 Transformer 解码器层，包含自注意力、交叉注意力（基于 MSDeformableAttention）以及前馈网络（Feed-Forward Network）。
+# TransformerDecoderLayer is a standard Transformer decoder layer combining self-attention, cross-attention
+# (based on MSDeformableAttention) and a feed-forward network.
 class TransformerDecoderLayer(nn.Module):
     def __init__(self,
                  d_model=256,
@@ -277,7 +280,8 @@ class TransformerDecoder(nn.Module):
 
         return torch.stack(dec_out_bboxes), torch.stack(dec_out_logits)
 
-# RTDETRTransformer 是整个模型的核心，继承自 nn.Module。它将所有模块（输入投影、解码器、变形注意力、前馈网络等）组合成一个完整的目标检测框架。
+# RTDETRTransformer is the core of the model, inheriting from nn.Module. It combines every module (input projection,
+# decoder, deformable attention, feed-forward network, etc.) into a complete object detection framework.
 @register
 class RTDETRTransformer(nn.Module):
     __share__ = ['num_classes']

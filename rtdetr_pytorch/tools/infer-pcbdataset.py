@@ -44,9 +44,9 @@ def postprocess(labels, boxes, scores, iou_threshold=0.7):
         current_label = labels[i]
         current_score = scores[i]
 
-        # # 强制将标签0替换为1 (或其他有效标签)
+        # # Forcefully replace label 0 with 1 (or another valid label)
         # if current_label == 0:
-        #     current_label = 1  # 或者你可以将标签0直接忽略掉
+        #     current_label = 1  # or you can simply ignore label 0
 
         boxes_to_merge = [current_box]
         scores_to_merge = [current_score]
@@ -120,14 +120,14 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
     os.makedirs(path, exist_ok=True)
     log_file_path = os.path.join(path, "log.txt")
 
-    # 定义颜色映射（6种缺陷对应颜色）
+    # Define the color mapping (colors for the 6 defect types)
     color_mapping = {
-        0: "#FF0000",  # Missing Hole open - 红色
-        1: "#00FF00",  # Mouse Bite short- 绿色
-        2: "#0000FF",  # Open Circuit  mousebite - 蓝色
-        3: "#FFFF00",  # Short -  spur  黄色
-        4: "#FF00FF",  # Spur -   copper 品红
-        5: "#00FFFF"  # Spurious Copper -   pin-hole 青色
+        0: "#FF0000",  # Missing Hole open - red
+        1: "#00FF00",  # Mouse Bite short- green
+        2: "#0000FF",  # Open Circuit  mousebite - blue
+        3: "#FFFF00",  # Short -  spur  yellow
+        4: "#FF00FF",  # Spur -   copper  magenta
+        5: "#00FFFF"  # Spurious Copper -   pin-hole cyan
     }
     # pcbdataset
     label_mapping = {
@@ -154,20 +154,20 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
             lab = labels_list[i].detach().cpu().numpy()
             box = boxes_list[i].detach().cpu().numpy()
 
-            # 过滤结果
+            # Filter results
             filtered_indices = (scr > thrh)
             filtered_labels = lab[filtered_indices]
             filtered_boxes = box[filtered_indices]
             filtered_scores = scr[filtered_indices]
-            # 写入日志文件（修复日志空置问题）
-            log_file.write(f"图像 {image_names[i]} 的检测结果：\n")
+            # Write to the log file (fixed the previously empty log)
+            log_file.write(f"Detection results for image {image_names[i]}:\n")
             if len(filtered_labels) == 0:
-                log_file.write("  无有效检测结果\n")
+                log_file.write("  No valid detections\n")
             else:
                 for lbl, scr, bbox in zip(filtered_labels, filtered_scores, filtered_boxes):
-                    log_file.write(f"  标签: {label_mapping[lbl]} 分数: {scr:.2f} 位置: {bbox.tolist()}\n")
+                    log_file.write(f"  Label: {label_mapping[lbl]} Score: {scr:.2f} Location: {bbox.tolist()}\n")
 
-            # 记录已绘制的文本区域
+            # Track already drawn text regions
             drawn_text_areas = []
 
             im_width, im_height = im.size
@@ -177,7 +177,7 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
                 label_name = label_mapping.get(label_id, 'Unknown')
                 color = color_mapping.get(label_id, "#FF0000")
 
-                # 设置字体
+                # Set the font
                 try:
                     font = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 80)
                 except:
@@ -186,27 +186,27 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
                     except:
                         font = ImageFont.load_default()
 
-                # 创建文本
+                # Create the text
                 text = f"{label_name} {filtered_scores[j]:.2f}"
                 text_bbox = draw_obj.textbbox((0, 0), text, font=font)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
-                # 添加padding（关键改进）
+                # Add padding (key improvement)
                 padding = 5
                 text_width += padding * 2
                 text_height += padding * 2
 
-                # 智能位置选择
+                # Smart position selection
                 box_left, box_top, box_right, box_bottom = b
                 box_center_x = (box_left + box_right) / 2
                 box_center_y = (box_top + box_bottom) / 2
 
-                # 候选位置：上、下、左、右
+                # Candidate positions: top, bottom, left, right
                 candidate_positions = [
-                    (box_left, box_top - text_height - 10),  # 上方
-                    (box_left, box_bottom + 10),            # 下方
-                    (box_left - text_width - 10, box_top),   # 左侧
-                    (box_right + 10, box_top)                # 右侧
+                    (box_left, box_top - text_height - 10),  # above
+                    (box_left, box_bottom + 10),            # below
+                    (box_left - text_width - 10, box_top),   # left
+                    (box_right + 10, box_top)                # right
                 ]
 
                 best_pos = None
@@ -218,7 +218,7 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
                     text_y = np.clip(text_y, 0, im_height - text_height)
                     current_rect = (text_x, text_y, text_x + text_width, text_y + text_height)
 
-                    # 计算与已有文本区域的重叠
+                    # Compute overlap with already drawn text regions
                     overlap = 0
                     for prev_rect in drawn_text_areas:
                         x_overlap = max(0, min(current_rect[2], prev_rect[2]) - max(current_rect[0], prev_rect[0]))
@@ -229,30 +229,30 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
                         min_overlap = overlap
                         best_pos = (text_x, text_y)
 
-                # 如果所有候选位置都有重叠，则选择重叠最小的位置
+                # If all candidate positions overlap, choose the one with the least overlap
                 if best_pos is None:
-                    # 如果没有合适的位置，选择默认上方位置
+                    # If no suitable position, choose the default position above
                     best_pos = (box_left, box_top - text_height - 10)
 
-                # 最终边界保护
+                # Final boundary protection
                 text_x, text_y = best_pos
                 text_x = np.clip(text_x, 0, im_width - text_width)
                 text_y = np.clip(text_y, 0, im_height - text_height)
 
-                # 防止下方越界
+                # Prevent overflow below
                 if text_y + text_height > im_height:
                     text_y = im_height - text_height
 
-                # 记录文本区域
+                # Record the text region
                 drawn_text_areas.append((text_x, text_y, text_x + text_width, text_y + text_height))
 
-                # 绘制背景
+                # Draw the background
                 draw_obj.rectangle(
                     [text_x, text_y, text_x + text_width, text_y + text_height],
-                    fill=color + "80"  # 半透明背景
+                    fill=color + "80"  # semi-transparent background
                 )
 
-                # 绘制文本
+                # Draw the text
                 draw_obj.text(
                     (text_x + padding, text_y + padding),
                     text,
@@ -260,13 +260,13 @@ def draw(images, labels_list, boxes_list, scores_list, thrh=0.7,
                     fill="black"
                 )
 
-                # 绘制边界框
+                # Draw the bounding box
                 # draw_obj.rectangle(list(b), outline="#FF0000", width=8)
                 draw_obj.rectangle(list(b), outline=color, width=8)
-            # 保存图像
+            # Save the image
             im.save(os.path.join(path, f'results_{image_names[i]}'))
 def load_model(cfg, checkpoint_path):
-    """加载模型并恢复训练状态"""
+    """Load the model and restore training state"""
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     if 'ema' in checkpoint:
         state_dict = checkpoint['ema']['module']
@@ -274,7 +274,7 @@ def load_model(cfg, checkpoint_path):
         state_dict = checkpoint['model']
 
     try:
-        # 加载模型时使用 strict=False 来忽略不匹配的参数
+        # When loading the model, use strict=False to ignore mismatched parameters
         cfg.model.load_state_dict(state_dict, strict=False)
     except RuntimeError as e:
         print(f"Error loading state_dict: {e}")
@@ -285,15 +285,15 @@ def load_model(cfg, checkpoint_path):
 def main(args, ):
     """main
     """
-    # # 保存标准输出的原始引用
+    # # Save the original reference to standard output
     # original_stdout = sys.stdout
-    # # 打开文件以写入日志
+    # # Open a file to write the log
     # with open('training_log.txt', 'w') as f:
-    #     sys.stdout = f  # 将标准输出重定向到文件
+    #     sys.stdout = f  # redirect standard output to the file
 
-    # 这里放置模型加载、训练等逻辑
+    # Model loading, training, etc. logic goes here
     cfg = YAMLConfig(args.config, resume=args.resume)
-    # 加载模型并恢复状态
+    # Load the model and restore its state
     model = load_model(cfg, args.resume)
     model.to(args.device)
     if args.resume:
@@ -307,12 +307,12 @@ def main(args, ):
     # NOTE load train mode state -> convert to deploy mode
     cfg.model.load_state_dict(state)
 
-    # print("开始训练...")  # 示例输出
-    # for epoch in range(num_epochs):  # 假设有一个 num_epochs 变量
+    # print("Start training...")  # sample output
+    # for epoch in range(num_epochs):  # assuming there is a num_epochs variable
     #     print(f"Epoch {epoch + 1}/{num_epochs}")
-    #     # 你的训练逻辑
+    #     # your training logic
 
-    # sys.stdout = original_stdout  # 恢复标准输出
+    # sys.stdout = original_stdout  # restore standard output
     class Model(nn.Module):
         def __init__(self, ) -> None:
             super().__init__()
@@ -325,59 +325,59 @@ def main(args, ):
             return outputs
 
     model = Model().to(args.device)
-    # im_pil = Image.open(args.im_file).convert('RGB')       #打开单个图片路径，convert为转化为rgb形式
-    # w, h = im_pil.size                              #获取图片尺寸，宽和高
-    # orig_size = torch.tensor([w, h])[None].to(args.device)      #创建一个pytorch张量（tensor），包含图片宽度和高度的一维数组
+    # im_pil = Image.open(args.im_file).convert('RGB')       # open a single image path; convert turns it into RGB
+    # w, h = im_pil.size                              # get the image size, width and height
+    # orig_size = torch.tensor([w, h])[None].to(args.device)      # create a PyTorch tensor with a 1-D array of image width and height
 
     transforms = T.Compose([
         T.Resize((640, 640)),
         T.ToTensor(),
     ])
-     # 用于存储处理的图像、标签、框、分数及其文件名
+     # Used to store the processed images, labels, boxes, scores, and their file names
     images = []
     labels_list = []
     boxes_list = []
     scores_list = []
-    image_names = []  # 在这里定义 image_names
-    # Batch process all images in the specified directory,#遍历文件夹读取图片
-    image_names = []  # 用于存储图像的文件名
+    image_names = []  # define image_names here
+    # Batch process all images in the specified directory, # read images by iterating the folder
+    image_names = []  # used to store image file names
     for image_name in os.listdir(args.im_dir):
         im_path = os.path.join(args.im_dir, image_name)
         if not im_path.lower().endswith(('.png', '.jpg', '.jpeg')):
             continue
-    # 读取图片并转化为rgb
+    # Read the image and convert to RGB
         im_pil = Image.open(im_path).convert('RGB')
         w, h = im_pil.size
         orig_size = torch.tensor([w, h])[None].to(args.device)
         im_data = transforms(im_pil)[None].to(args.device)
-    # 前向传播获取检测结果
+    # Forward pass to obtain detection results
         output = model(im_data, orig_size)
         labels, boxes, scores = output
-        # 将结果存储在列表中
+        # Store the results in lists
         images.append(im_pil)
         labels_list.append(labels)
         boxes_list.append(boxes)
         scores_list.append(scores)
 
-        image_names.append(image_name)  # 保存文件名
-        # 在处理完所有图像后调用绘图函数
-        print("Drawing results...")  # 添加调试打印
+        image_names.append(image_name)  # save the file name
+        # Call the drawing function after all images have been processed
+        print("Drawing results...")  # add debug print
         draw(images, labels_list, boxes_list, scores_list, 0.46, path=args.output_dir,image_names=image_names)
-        print("Results saved.")  # 添加调试打印
+        print("Results saved.")  # add debug print
 
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str,default=r'configs/rtdetr/rtdetr_r18vd_6x_coco.yml' )       #指定配置文件路径
-    parser.add_argument('-r', '--resume', type=str, default=r'outputs/pcbdataset/best_map50.pth')   #指定训练权重文件路径
-    # parser.add_argument('-f', '--im-file', type=str,default=r'path/to/image.jpg')                  #用于单张图片路径
-    # parser.add_argument('-s', '--sliced', type=bool, default=False)                                                                                         #是否切片处理
-    parser.add_argument('-d', '--device', type=str, default='cuda')                                                                                             #设备选择，cpu，cuda
+    parser.add_argument('-c', '--config', type=str,default=r'configs/rtdetr/rtdetr_r18vd_6x_coco.yml' )       #specify the path to the config file
+    parser.add_argument('-r', '--resume', type=str, default=r'outputs/pcbdataset/best_map50.pth')   #specify the path to the training weight file
+    # parser.add_argument('-f', '--im-file', type=str,default=r'path/to/image.jpg')                  #for a single image path
+    # parser.add_argument('-s', '--sliced', type=bool, default=False)                                                                                         #whether to process slices
+    parser.add_argument('-d', '--device', type=str, default='cuda')                                                                                             #device selection, cpu, cuda
     parser.add_argument('--im-dir', type=str, default=r'outputs/infer/pcb-dataset', help="Directory containing images to predict")
-    # parser.add_argument('-nc', '--numberofboxes', type=int, default=25)                                                                                  #切片模式下的切片数量
-    parser.add_argument('-o', '--output-dir', type=str, default=r'outputs/infer/pcb-dataset/result', help="Path to the directory where output images will be saved.")                                # 新增输出目录参数
+    # parser.add_argument('-nc', '--numberofboxes', type=int, default=25)                                                                                  #number of slices in slice mode
+    parser.add_argument('-o', '--output-dir', type=str, default=r'outputs/infer/pcb-dataset/result', help="Path to the directory where output images will be saved.")                                # new output directory parameter
     args = parser.parse_args()
     main(args)
 
