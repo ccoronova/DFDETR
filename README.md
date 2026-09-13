@@ -95,9 +95,3 @@ python tools/inferdeeppcb.py
 ```
 
 > Datasets are configured through the `DATASET` variable in [`tools/train.py`](rtdetr_pytorch/tools/train.py). For training details, ablation switches (`use_amsf` / `use_edge_enhancer` / `use_texture_aware`), and custom datasets, see [`rtdetr_pytorch/`](rtdetr_pytorch/) and [`rtdetr_pytorch/tools/README.md`](rtdetr_pytorch/tools/README.md).
-
-### Reproducing the ablations
-- `rtdetr_r18vd_6x_coco.yml` — full DFDETR (`use_dadc=True, use_swfd=True`).
-- `rtdetr_r18vd_6x_abl_baseline.yml` — RT-DETR baseline (both modules off).
-- `rtdetr_r18vd_6x_abl_dadc.yml` — baseline + DADC only.
-- `rtdetr_r18vd_6x_abl_texture.yml` — 
