@@ -1,0 +1,31 @@
+﻿dataset,model,mAP,AP50,AP75,AP_small,AP_medium,AP_large,source
+pcb,SurfDETR,51.00,97.08,46.56,36.15,51.11,44.94,self-log
+deeppcb,SurfDETR,82.11,98.71,93.08,83.00,82.40,,self-log
+pcb,RT-DETR,51.54,96.00,49.42,40.07,51.92,42.74,self-log
+deeppcb,RT-DETR,82.22,98.62,92.84,82.39,82.51,,self-log
+pcb,消融-基线+边缘+纹理,51.14,95.52,48.17,43.44,51.65,40.27,self-log
+pcb,消融-基线+纹理(TAM),51.17,96.03,48.97,49.15,51.70,40.37,self-log
+deeppcb,Deformable DETR,56.20,89.70,63.00,58.30,57.70,-100.00,mmdet-log
+pcb,Deformable DETR,17.10,53.90,4.20,8.90,17.80,14.80,mmdet-log
+deeppcb,Faster-RCNN,75.60,97.70,89.80,76.70,76.50,-100.00,mmdet-log
+pcb,Faster-RCNN,45.60,94.40,34.70,30.10,46.40,33.60,mmdet-log
+deeppcb,FCOS,58.70,97.30,64.70,66.10,57.40,-100.00,mmdet-log
+pcb,FCOS,43.00,92.30,31.00,32.70,44.10,32.20,mmdet-log
+deeppcb,TOOD,77.50,98.10,89.90,79.00,77.80,-100.00,mmdet-log
+pcb,TOOD,48.90,94.40,44.00,45.20,49.50,36.30,mmdet-log
+deeppcb,VFNet,74.60,98.50,86.90,76.60,75.00,-100.00,mmdet-log
+pcb,VFNet,47.10,93.70,40.30,35.20,47.80,29.60,mmdet-log
+pcb,YOLOv3,50.10,93.89,46.23,40.30,50.57,39.26,yolo-pred
+pcb,YOLOv5-m,49.71,94.44,46.76,27.36,50.16,43.75,yolo-pred
+pcb,YOLOv6-m,44.98,89.81,37.79,15.33,45.40,38.33,yolo-pred
+pcb,YOLOv8-m,49.39,93.99,46.07,17.18,50.18,35.91,yolo-pred
+pcb,YOLOv9-m,49.85,93.90,48.25,34.78,50.40,40.02,yolo-pred
+pcb,YOLOv10-b,49.80,94.11,45.00,28.01,50.54,40.91,yolo-pred
+pcb,YOLO11-l,49.72,93.93,46.97,13.96,50.31,43.89,yolo-pred
+deeppcb,YOLOv3,71.35,96.99,86.62,70.45,72.61,-100.00,yolo-pred
+deeppcb,YOLOv5-m,77.32,98.43,91.81,79.02,77.69,-100.00,yolo-pred
+deeppcb,YOLOv6-m,74.27,96.87,86.99,73.15,75.09,-100.00,yolo-pred
+deeppcb,YOLOv8-m,70.31,97.34,83.42,67.51,71.79,-100.00,yolo-pred
+deeppcb,YOLOv9-m,66.08,98.06,77.84,63.51,67.34,-100.00,yolo-pred
+deeppcb,YOLOv10-b,76.38,97.66,90.11,74.25,77.95,-100.00,yolo-pred
+deeppcb,YOLO11-l,73.07,96.25,86.78,72.54,74.54,-100.00,yolo-pred

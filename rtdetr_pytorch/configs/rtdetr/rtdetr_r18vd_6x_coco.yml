@@ -1,0 +1,66 @@
+
+__include__: [
+  '../dataset/coco_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetr_r50vd.yml',
+]
+
+
+output_dir: outputs/rtdetr_r18vd_6x_coco
+
+
+#pcb-mixpresent1
+model: RTDETR
+criterion: SetCriterion
+postprocessor: RTDETRPostProcessor
+
+RTDETR:
+ backbone: PResNet
+ encoder: HybridEncoder
+ decoder: RTDETRTransformer
+#  multi_scale: [480, 512, 544, 576, 608, 640, 640, 640, 672, 704, 736, 768, 800]
+ scale: [640]
+
+PResNet:
+  depth: 18
+  freeze_at: -1
+  freeze_norm: False
+  pretrained: True
+
+HybridEncoder:
+  in_channels: [128, 256, 512]
+  hidden_dim: 256
+  expansion: 0.5
+  # DFDETR 增强模块: 方向感知可变形卷积 + 平稳小波特征分解（论文方法）
+  use_dadc: True
+  use_swfd: True
+  use_amsf: False
+
+
+RTDETRTransformer:
+  eval_idx: -1
+  num_decoder_layers: 3
+  num_denoising: 100
+
+
+
+optimizer:
+  type: AdamW
+  params: 
+    - 
+      params: '^(?=.*backbone)(?=.*norm).*$'
+      lr: 0.00005
+      weight_decay: 0.
+    - 
+      params: '^(?=.*backbone)(?!.*norm).*$'
+      lr: 0.00005
+    - 
+      params: '^(?=.*(?:encoder|decoder))(?=.*(?:norm|bias)).*$'
+      weight_decay: 0.
+
+  lr: 0.0005
+  betas: [0.9, 0.999]
+  weight_decay: 0.0005
+

@@ -1,0 +1,70 @@
+__include__: [
+  '../dataset/coco_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetr_r50vd.yml',
+]
+
+
+# =============================================================
+# 消融: 基线 + 仅纹理感知模块(Texture-Aware Module)
+# 关闭边缘增强器(use_edge_enhancer=False), 保留纹理感知模块(use_texture_aware=True)
+# 对应审稿意见10 要求的 baseline+Texture Module 组合
+# 数据集: PCB-DATASET(在 train.py 中 DATASET='pcb')
+# =============================================================
+output_dir: outputs/rtdetr_r18vd_abl_texture
+
+
+#pcb-mixpresent1
+model: RTDETR
+criterion: SetCriterion
+postprocessor: RTDETRPostProcessor
+
+RTDETR:
+ backbone: PResNet
+ encoder: HybridEncoder
+ decoder: RTDETRTransformer
+ scale: [640]
+
+PResNet:
+  depth: 18
+  freeze_at: -1
+  freeze_norm: False
+  pretrained: True
+
+HybridEncoder:
+  in_channels: [128, 256, 512]
+  hidden_dim: 256
+  expansion: 0.5
+  # 旧版 AMSF 消融: 仅纹理感知模块，关闭边缘增强 / DADC / SWFD（保持"基线+纹理"语义）
+  use_amsf: True
+  use_edge_enhancer: False      # 关闭边缘增强器
+  use_texture_aware: True       # 仅保留纹理感知模块
+  use_dadc: False
+  use_swfd: False
+
+
+RTDETRTransformer:
+  eval_idx: -1
+  num_decoder_layers: 3
+  num_denoising: 100
+
+
+optimizer:
+  type: AdamW
+  params: 
+    - 
+      params: '^(?=.*backbone)(?=.*norm).*$'
+      lr: 0.00005
+      weight_decay: 0.
+    - 
+      params: '^(?=.*backbone)(?!.*norm).*$'
+      lr: 0.00005
+    - 
+      params: '^(?=.*(?:encoder|decoder))(?=.*(?:norm|bias)).*$'
+      weight_decay: 0.
+
+  lr: 0.0005
+  betas: [0.9, 0.999]
+  weight_decay: 0.0005
