@@ -94,4 +94,4 @@ python tools/infer-pcbdataset.py
 python tools/inferdeeppcb.py
 ```
 
-> Datasets are configured through the `DATASET` variable in [`tools/train.py`](rtdetr_pytorch/tools/train.py). For training details, ablation switches (`use_amsf` / `use_edge_enhancer` / `use_texture_aware`), and custom datasets, see [`rtdetr_pytorch/`](rtdetr_pytorch/) and [`rtdetr_pytorch/tools/README.md`](rtdetr_pytorch/tools/README.md).
+
